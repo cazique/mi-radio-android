@@ -104,7 +104,28 @@ Formato del JSON:
 Quitar una emisora del JSON remoto y volver a sincronizar también la quita de la app (las que el
 usuario haya marcado como favorita mantienen esa marca si vuelve a aparecer con el mismo `id`).
 
-## Cómo compilar el APK
+## Cómo compilar el APK desde el móvil (sin PC ni Android Studio)
+
+El repo incluye un flujo de **GitHub Actions** (`.github/workflows/build-apk.yml`) que compila el APK
+en la nube cada vez que hay cambios en `main`. No necesitas Termux, SDK ni nada instalado en el
+teléfono:
+
+1. Cada `push` a `main` lanza la compilación automáticamente. Si quieres forzar una sin cambiar
+   código, entra en la app o web de GitHub → este repo → pestaña **Actions** → workflow
+   "Compilar APK" → **Run workflow**.
+2. Espera a que termine (unos 3-5 minutos; verás un ✅ verde cuando acabe).
+3. Ve a la pestaña **Releases** del repositorio (o a `github.com/cazique/mi-radio-android/releases`)
+   y abre **"Última compilación (debug)"**.
+4. Descarga `app-debug.apk` directamente desde ahí con el navegador del móvil — es un `.apk` suelto,
+   no un `.zip`, así que no hace falta descomprimir nada.
+5. Al abrir el archivo descargado, Android te pedirá permitir "instalar apps de origen desconocido"
+   para Chrome (o la app que hayas usado para descargar) la primera vez. Actívalo solo para esa app
+   y confirma la instalación.
+
+Es un APK de depuración (firmado con la clave de debug automática de Android, no para subir a Play
+Store), pero perfectamente instalable y funcional para probar la app en tu propio dispositivo.
+
+## Cómo compilar el APK con Android Studio (en un PC)
 
 1. Instala **Android Studio** (Ladybug o posterior) con el SDK de Android 35 y JDK 17.
 2. Clona este repositorio y ábrelo como proyecto (`File → Open`).

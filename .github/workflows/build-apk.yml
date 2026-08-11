@@ -1,0 +1,55 @@
+name: Compilar APK
+
+# Se ejecuta solo: en cada push a main y cuando lo lanzas a mano desde la
+# pestaña "Actions" de GitHub (botón "Run workflow"), útil si quieres un APK
+# nuevo sin haber cambiado código. No hace falta Android Studio ni un PC:
+# GitHub compila en su propia máquina y deja el APK listo para descargar.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Configurar JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Dar permisos de ejecución a gradlew
+        run: chmod +x gradlew
+
+      - name: Compilar APK de depuración (instalable directamente)
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Guardar el APK como artefacto de esta ejecución
+        uses: actions/upload-artifact@v4
+        with:
+          name: mi-radio-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Publicar el APK en una "Release" de descarga directa
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-debug
+          name: Última compilación (debug)
+          body: |
+            APK de depuración generado automáticamente desde el commit
+            ${{ github.sha }}. Descárgalo directamente en tu móvil desde
+            esta página (no hace falta descomprimir nada) y ábrelo para
+            instalarlo.
+          prerelease: true
+          files: app/build/outputs/apk/debug/app-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
