@@ -1,0 +1,172 @@
+package com.miradio.app.ui.home
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Circle
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.miradio.app.R
+import com.miradio.app.domain.model.OutputDevice
+import com.miradio.app.domain.model.RadioStation
+import com.miradio.app.ui.components.CastButton
+import com.miradio.app.ui.components.PlayerCard
+import com.miradio.app.ui.components.StationListItem
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HomeScreen(
+    showFavoritesOnly: Boolean,
+    onOpenPlayer: () -> Unit,
+    onAddStation: () -> Unit,
+    onEditStation: (RadioStation) -> Unit,
+    onOpenSettings: () -> Unit,
+    viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
+) {
+    val state by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(showFavoritesOnly) {
+        viewModel.setShowFavoritesOnly(showFavoritesOnly)
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.home_title), style = MaterialTheme.typography.titleLarge) },
+                actions = {
+                    CastButton()
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.nav_settings))
+                    }
+                },
+            )
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = onAddStation) {
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.home_add_station))
+            }
+        },
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentPadding = PaddingValues(bottom = 24.dp),
+        ) {
+            item {
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    DeviceIndicator(
+                        deviceName = if (state.player.outputDevice == OutputDevice.CAST) {
+                            state.player.castDeviceName ?: stringResource(R.string.home_device_this_phone)
+                        } else {
+                            stringResource(R.string.home_device_this_phone)
+                        },
+                    )
+                }
+            }
+
+            item {
+                PlayerCard(
+                    station = state.displayedStation,
+                    status = state.player.status,
+                    onPlayPauseClick = { viewModel.onPrimaryPlayClick(state) },
+                    onCardClick = if (state.displayedStation != null) onOpenPlayer else null,
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp)
+                        .fillMaxWidth(),
+                )
+            }
+
+            item {
+                OutlinedTextField(
+                    value = state.searchQuery,
+                    onValueChange = viewModel::onSearchQueryChange,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    placeholder = { Text(stringResource(R.string.home_search_hint)) },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.cd_search)) },
+                    singleLine = true,
+                )
+            }
+
+            item {
+                Text(
+                    text = if (showFavoritesOnly) stringResource(R.string.home_favorites) else stringResource(R.string.home_my_stations),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+
+            if (state.visibleStations.isEmpty() && !state.isLoading) {
+                item {
+                    Text(
+                        text = stringResource(R.string.home_no_stations),
+                        style = MaterialTheme.typography.bodyLarge,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                    )
+                }
+            }
+
+            items(state.visibleStations, key = { it.id }) { station ->
+                StationListItem(
+                    station = station,
+                    isPlaying = state.player.station?.id == station.id,
+                    onClick = { viewModel.onStationClick(station) },
+                    onFavoriteClick = { viewModel.onFavoriteToggle(station) },
+                    onEditClick = if (station.source == com.miradio.app.domain.model.StationSource.LOCAL) {
+                        { onEditStation(station) }
+                    } else null,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeviceIndicator(deviceName: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Icon(
+            imageVector = Icons.Filled.Circle,
+            contentDescription = null,
+            tint = com.miradio.app.ui.theme.SuccessGreen,
+            modifier = Modifier.size(10.dp),
+        )
+        Text(
+            text = stringResource(R.string.home_device_label, deviceName),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}

@@ -1,0 +1,75 @@
+{
+  "_comment": "Ejemplo de catálogo remoto. Alójalo donde quieras (GitHub raw, Gist, tu propio servidor) y pega la URL cruda en Ajustes > Catálogo remoto de emisoras. Añadir una emisora nueva es tan sencillo como añadir un objeto a este array y volver a publicar el archivo: la app la recogerá al pulsar 'Actualizar ahora', sin publicar una nueva versión de la APK.",
+  "stations": [
+    {
+      "id": "cope_madrid",
+      "name": "COPE Madrid",
+      "city": "Madrid",
+      "streamUrl": "https://flucast09-h-cloud.flumotion.com/cope/madrid.mp3",
+      "logoUrl": "https://graph.facebook.com/copemadrid/picture?width=200&height=200",
+      "description": "Emisora de Cadena COPE para Madrid.",
+      "category": "Generalista",
+      "isAvailable": true
+    },
+    {
+      "id": "cope_la_baneza",
+      "name": "COPE La Bañeza",
+      "city": "La Bañeza (León)",
+      "streamUrl": "https://wecast-bl01.flumotion.com/copesedes/leon.mp3",
+      "logoUrl": "https://graph.facebook.com/cope.leon/picture?width=200&height=200",
+      "description": "Se usa el stream regional de COPE León hasta disponer de la URL exacta de la sede local.",
+      "category": "Generalista",
+      "isAvailable": true
+    },
+    {
+      "id": "cope_leon",
+      "name": "COPE León",
+      "city": "León",
+      "streamUrl": "https://wecast-bl01.flumotion.com/copesedes/leon.mp3",
+      "logoUrl": "https://graph.facebook.com/cope.leon/picture?width=200&height=200",
+      "description": "Emisora de Cadena COPE para León.",
+      "category": "Generalista",
+      "isAvailable": true
+    },
+    {
+      "id": "ser_madrid",
+      "name": "SER Madrid",
+      "city": "Madrid",
+      "streamUrl": "https://playerservices.streamtheworld.com/api/livestream-redirect/SER_MADRID.mp3",
+      "logoUrl": "https://graph.facebook.com/cadenaser/picture?width=200&height=200",
+      "description": "Cadena SER, emisora de Madrid.",
+      "category": "Generalista",
+      "isAvailable": true
+    },
+    {
+      "id": "onda_cero_madrid",
+      "name": "Onda Cero Madrid",
+      "city": "Madrid",
+      "streamUrl": "https://radio-atres-live.ondacero.es/api/livestream-redirect/OCAAC.m3u8",
+      "logoUrl": "https://graph.facebook.com/ondaceromn/picture?width=200&height=200",
+      "description": "Onda Cero, emisora de Madrid (stream HLS).",
+      "category": "Generalista",
+      "isAvailable": true
+    },
+    {
+      "id": "rne_radio_nacional",
+      "name": "RNE - Radio Nacional",
+      "city": "Madrid",
+      "streamUrl": "https://dispatcher.rndfnk.com/crtve/rne1/mad/mp3/high",
+      "logoUrl": "https://graph.facebook.com/radionacionalrne/picture?width=200&height=200",
+      "description": "Radio Nacional de España, canal generalista.",
+      "category": "Pública",
+      "isAvailable": true
+    },
+    {
+      "id": "rne_radio5",
+      "name": "RNE - Radio 5 Todo Noticias",
+      "city": "Madrid",
+      "streamUrl": "https://dispatcher.rndfnk.com/crtve/rne5/mad/mp3/high",
+      "logoUrl": "https://graph.facebook.com/radionacionalrne/picture?width=200&height=200",
+      "description": "Radio 5, información 24 horas de RTVE.",
+      "category": "Pública",
+      "isAvailable": true
+    }
+  ]
+}

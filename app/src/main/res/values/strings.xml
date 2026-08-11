@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Mi Radio</string>
+
+    <!-- Navegación -->
+    <string name="nav_home">Inicio</string>
+    <string name="nav_stations">Emisoras</string>
+    <string name="nav_favorites">Favoritos</string>
+    <string name="nav_settings">Ajustes</string>
+
+    <!-- Home -->
+    <string name="home_title">MI RADIO</string>
+    <string name="home_device_this_phone">Este móvil</string>
+    <string name="home_device_label">Dispositivo: %1$s</string>
+    <string name="home_my_stations">Mis emisoras</string>
+    <string name="home_favorites">Mis favoritos</string>
+    <string name="home_search_hint">Buscar emisoras…</string>
+    <string name="home_no_stations">Todavía no hay emisoras. Pulsa “Añadir emisora” para empezar.</string>
+    <string name="home_add_station">Añadir emisora</string>
+
+    <!-- Reproductor -->
+    <string name="player_play">Reproducir</string>
+    <string name="player_pause">Pausar</string>
+    <string name="player_stop">Detener</string>
+    <string name="player_favorite">Favorito</string>
+    <string name="player_remove_favorite">Quitar de favoritos</string>
+    <string name="player_cast">Cast</string>
+    <string name="player_connecting">Conectando…</string>
+    <string name="player_buffering">Cargando emisora…</string>
+    <string name="player_playing_on">Sonando en %1$s</string>
+    <string name="player_no_station">Selecciona una emisora para empezar a escuchar</string>
+    <string name="player_status_playing">Reproduciendo</string>
+    <string name="player_status_paused">En pausa</string>
+    <string name="player_status_stopped">Detenido</string>
+    <string name="player_status_error">Error de conexión</string>
+    <string name="player_live_badge">EN DIRECTO</string>
+    <string name="player_sleep_timer">Apagado programado</string>
+    <string name="player_sleep_timer_active">Se apaga en %1$d min %2$d s</string>
+
+    <!-- Errores -->
+    <string name="error_stream_unavailable">No se puede conectar con esta emisora. Comprueba tu conexión a Internet.</string>
+    <string name="error_invalid_url">La URL del stream no parece válida.</string>
+    <string name="error_timeout">La emisora está tardando demasiado en responder. Inténtalo de nuevo.</string>
+    <string name="error_station_offline">Esta emisora no está disponible en este momento.</string>
+    <string name="error_cast_unavailable">No se ha encontrado ningún dispositivo Cast disponible en la red.</string>
+    <string name="error_generic_playback">No se ha podido reproducir la emisora. Inténtalo de nuevo más tarde.</string>
+    <string name="error_remote_catalog">No se ha podido actualizar el catálogo remoto de emisoras.</string>
+
+    <!-- Gestión de emisoras -->
+    <string name="stations_title">Emisoras</string>
+    <string name="stations_add_title">Añadir emisora</string>
+    <string name="stations_edit_title">Editar emisora</string>
+    <string name="stations_field_name">Nombre de la emisora</string>
+    <string name="stations_field_city">Ciudad</string>
+    <string name="stations_field_stream_url">URL del stream</string>
+    <string name="stations_field_logo_url">URL del logotipo (opcional)</string>
+    <string name="stations_field_description">Descripción (opcional)</string>
+    <string name="stations_field_category">Categoría (opcional)</string>
+    <string name="stations_save">Guardar</string>
+    <string name="stations_delete">Eliminar emisora</string>
+    <string name="stations_delete_confirm">¿Seguro que quieres eliminar esta emisora?</string>
+    <string name="stations_validation_required">Este campo es obligatorio.</string>
+    <string name="stations_validation_url">Introduce una URL http/https válida.</string>
+    <string name="stations_check_url_button">Comprobar stream</string>
+    <string name="stations_checking_url">Comprobando el stream…</string>
+    <string name="stations_url_ok">El stream responde correctamente.</string>
+    <string name="stations_url_failed">No se ha podido validar el stream. ¿Seguro que quieres guardarlo igualmente?</string>
+    <string name="stations_source_local">Añadida localmente</string>
+    <string name="stations_source_remote">Catálogo remoto</string>
+    <string name="stations_source_seed">Emisora incluida</string>
+
+    <!-- Ajustes -->
+    <string name="settings_title">Ajustes</string>
+    <string name="settings_theme">Tema</string>
+    <string name="settings_theme_system">Igual que el sistema</string>
+    <string name="settings_theme_light">Claro</string>
+    <string name="settings_theme_dark">Oscuro</string>
+    <string name="settings_remote_catalog">Catálogo remoto de emisoras</string>
+    <string name="settings_remote_catalog_url">URL del JSON remoto</string>
+    <string name="settings_remote_catalog_refresh">Actualizar ahora</string>
+    <string name="settings_remote_catalog_last_sync">Última actualización: %1$s</string>
+    <string name="settings_remote_catalog_never">nunca</string>
+    <string name="settings_about">Acerca de</string>
+    <string name="settings_version">Versión %1$s</string>
+
+    <!-- Cast -->
+    <string name="cast_connect_to">Conectar a un dispositivo</string>
+    <string name="cast_connected_to">Conectado a %1$s</string>
+    <string name="cast_disconnect">Desconectar</string>
+    <string name="cast_searching">Buscando dispositivos…</string>
+
+    <!-- Widget -->
+    <string name="widget_description">Muestra la emisora actual y permite reproducir/pausar y cambiar de emisora.</string>
+    <string name="widget_no_station">Sin emisora</string>
+
+    <!-- Accesibilidad -->
+    <string name="cd_play">Reproducir</string>
+    <string name="cd_pause">Pausar</string>
+    <string name="cd_stop">Detener</string>
+    <string name="cd_favorite">Marcar como favorito</string>
+    <string name="cd_cast">Enviar a un dispositivo Cast</string>
+    <string name="cd_station_logo">Logotipo de la emisora</string>
+    <string name="cd_search">Buscar</string>
+    <string name="cd_next_station">Siguiente emisora</string>
+    <string name="cd_previous_station">Emisora anterior</string>
+</resources>

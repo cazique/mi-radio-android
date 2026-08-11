@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Muchas emisoras (Icecast/Shoutcast de terceros) todavía sirven su stream
+    por HTTP plano en lugar de HTTPS. Se permite tráfico en claro únicamente
+    para poder reproducir esos streams; el resto de tráfico de la app
+    (catálogo remoto, logotipos, Cast) usa HTTPS.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
