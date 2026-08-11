@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Declara la App Action "actions.intent.OPEN_APP_FEATURE" para que Google
+  Assistant pueda decir "Ok Google, abre reproducir en Mi Radio" (o "abre
+  radio en directo en Mi Radio") y arranque la reproducción sin abrir la
+  interfaz. Se puede probar sin publicar en Play Store con la app "App
+  Actions Test Tool" de Google, aunque el reconocimiento por voz suele ser
+  más fiable una vez la app está publicada.
+
+  targetPackage está fijado a "com.miradio.app.debug" porque, de momento,
+  la app solo se distribuye como build de debug (ver app/build.gradle.kts,
+  applicationIdSuffix = ".debug"). Si algún día se publica un build de
+  release con el id "com.miradio.app" a secas, hay que actualizar este
+  valor también.
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <capability android:name="actions.intent.OPEN_APP_FEATURE">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.miradio.app.debug"
+            android:targetClass="com.miradio.app.MainActivity">
+            <parameter
+                android:name="feature"
+                android:key="featureParam" />
+        </intent>
+    </capability>
+
+    <shortcut
+        android:shortcutId="play_radio"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_play_short"
+        android:shortcutLongLabel="@string/shortcut_play_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.miradio.app.debug"
+            android:targetClass="com.miradio.app.MainActivity"
+            android:data="miradio://play" />
+        <capability-binding android:key="actions.intent.OPEN_APP_FEATURE">
+            <parameter-binding
+                android:key="feature"
+                android:value="reproducir" />
+        </capability-binding>
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="play_radio_directo"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_play2_short"
+        android:shortcutLongLabel="@string/shortcut_play2_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.miradio.app.debug"
+            android:targetClass="com.miradio.app.MainActivity"
+            android:data="miradio://play" />
+        <capability-binding android:key="actions.intent.OPEN_APP_FEATURE">
+            <parameter-binding
+                android:key="feature"
+                android:value="radio en directo" />
+        </capability-binding>
+    </shortcut>
+
+</shortcuts>

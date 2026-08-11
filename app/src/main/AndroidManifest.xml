@@ -51,6 +51,25 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- Enlace directo usado por el acceso directo de App Actions
+                 (Ok Google, "abre reproducir en Mi Radio") para arrancar la
+                 radio sin pasar por la interfaz. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="miradio" android:host="play" />
+            </intent-filter>
+
+            <!-- Declara la App Action "OPEN_APP_FEATURE" (ver res/xml/shortcuts.xml)
+                 para que Google Assistant pueda ofrecer "Ok Google, reproduce en
+                 Mi Radio". Funciona probando con la app de pruebas de App Actions
+                 de Google incluso sin publicar en Play Store, aunque el reconocimiento
+                 por voz es más fiable una vez publicada. -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
 
         <!-- Servicio en primer plano: MediaSession + ExoPlayer, controla la reproducción
