@@ -1,13 +1,14 @@
 package com.miradio.app.ui.components
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -24,6 +25,7 @@ import androidx.compose.ui.unit.dp
 private val presetsMinutes = listOf(5, 15, 30, 45, 60)
 private const val CUSTOM = -1
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SleepTimerDialog(onDismiss: () -> Unit, onConfirm: (minutes: Int) -> Unit) {
     var selected by remember { mutableIntStateOf(15) }
@@ -36,39 +38,33 @@ fun SleepTimerDialog(onDismiss: () -> Unit, onConfirm: (minutes: Int) -> Unit) {
         onDismissRequest = onDismiss,
         title = { Text("Apagar la radio en…") },
         text = {
-            LazyColumn {
-                items(presetsMinutes) { minutes ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(selected = selected == minutes, onClick = { selected = minutes })
-                        Text("$minutes minutos", modifier = Modifier.padding(start = 8.dp))
-                    }
-                }
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(selected = selected == CUSTOM, onClick = { selected = CUSTOM })
-                        Text("Personalizado:", modifier = Modifier.padding(start = 8.dp, end = 8.dp))
-                        OutlinedTextField(
-                            value = customText,
-                            onValueChange = {
-                                customText = it.filter { c -> c.isDigit() }.take(4)
-                                selected = CUSTOM
-                            },
-                            modifier = Modifier.padding(end = 4.dp),
-                            singleLine = true,
-                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
-                            suffix = { Text("min") },
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    presetsMinutes.forEach { minutes ->
+                        FilterChip(
+                            selected = selected == minutes,
+                            onClick = { selected = minutes },
+                            label = { Text("$minutes min") },
                         )
                     }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = selected == CUSTOM,
+                        onClick = { selected = CUSTOM },
+                        label = { Text("Personalizado") },
+                    )
+                    OutlinedTextField(
+                        value = customText,
+                        onValueChange = {
+                            customText = it.filter { c -> c.isDigit() }.take(4)
+                            selected = CUSTOM
+                        },
+                        modifier = Modifier.width(96.dp),
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
+                        suffix = { Text("min") },
+                    )
                 }
             }
         },

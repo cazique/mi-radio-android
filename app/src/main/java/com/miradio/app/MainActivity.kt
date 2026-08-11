@@ -3,7 +3,6 @@ package com.miradio.app
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
@@ -14,6 +13,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.fragment.app.FragmentActivity
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.miradio.app.ui.navigation.RadioBottomBar
@@ -21,7 +21,10 @@ import com.miradio.app.ui.navigation.RadioNavHost
 import com.miradio.app.ui.navigation.bottomBarRoutes
 import com.miradio.app.ui.theme.MiRadioTheme
 
-class MainActivity : ComponentActivity() {
+// El botón de Cast (MediaRouteButton) exige que la Activity que lo aloja
+// sea una FragmentActivity para poder mostrar su diálogo de selección de
+// dispositivo; con ComponentActivity a secas la app cerraba al tocarlo.
+class MainActivity : FragmentActivity() {
 
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* no-op: la notificación

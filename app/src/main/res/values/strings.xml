@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Mi Radio</string>
+    <string name="playback_channel_name">Reproducción de radio</string>
 
     <!-- Navegación -->
     <string name="nav_home">Inicio</string>

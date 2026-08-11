@@ -1,15 +1,15 @@
 package com.miradio.app.ui.components
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -28,6 +28,7 @@ private const val CUSTOM = -1
 
 /** Retardo del directo, pensado para sincronizar la radio con la tele
  *  (p. ej. un partido de fútbol) sin que se adelante el comentario. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DelayDialog(currentSeconds: Int, onDismiss: () -> Unit, onConfirm: (seconds: Int) -> Unit) {
     val startsCustom = currentSeconds !in presetsSeconds
@@ -41,52 +42,39 @@ fun DelayDialog(currentSeconds: Int, onDismiss: () -> Unit, onConfirm: (seconds:
         onDismissRequest = onDismiss,
         title = { Text("Retardo del directo") },
         text = {
-            Column {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
                     text = "Aproximado: se consigue aumentando el búfer de reproducción, así " +
-                        "que el desfase real puede variar un poco según la emisora y la red, " +
-                        "no es una sincronización exacta al fotograma.",
+                        "que el desfase real puede variar un poco según la emisora y la red.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 8.dp),
                 )
-                LazyColumn {
-                items(presetsSeconds) { seconds ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(selected = selected == seconds, onClick = { selected = seconds })
-                        Text(
-                            text = if (seconds == 0) "Sin retardo (directo real)" else "$seconds segundos",
-                            modifier = Modifier.padding(start = 8.dp),
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    presetsSeconds.forEach { seconds ->
+                        FilterChip(
+                            selected = selected == seconds,
+                            onClick = { selected = seconds },
+                            label = { Text(if (seconds == 0) "Directo" else "${seconds}s") },
                         )
                     }
                 }
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(selected = selected == CUSTOM, onClick = { selected = CUSTOM })
-                        Text("Personalizado:", modifier = Modifier.padding(start = 8.dp, end = 8.dp))
-                        OutlinedTextField(
-                            value = customText,
-                            onValueChange = {
-                                customText = it.filter { c -> c.isDigit() }.take(3)
-                                selected = CUSTOM
-                            },
-                            modifier = Modifier.padding(end = 4.dp),
-                            singleLine = true,
-                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
-                            suffix = { Text("s") },
-                        )
-                    }
-                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = selected == CUSTOM,
+                        onClick = { selected = CUSTOM },
+                        label = { Text("Personalizado") },
+                    )
+                    OutlinedTextField(
+                        value = customText,
+                        onValueChange = {
+                            customText = it.filter { c -> c.isDigit() }.take(3)
+                            selected = CUSTOM
+                        },
+                        modifier = Modifier.width(88.dp),
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
+                        suffix = { Text("s") },
+                    )
                 }
             }
         },

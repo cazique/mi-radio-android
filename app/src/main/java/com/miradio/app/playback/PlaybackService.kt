@@ -1,10 +1,19 @@
 package com.miradio.app.playback
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.os.Build
 import android.util.Log
+import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
+import androidx.core.content.getSystemService
+import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.google.android.gms.cast.framework.CastContext
+import com.miradio.app.R
 import com.miradio.app.data.database.AppDatabase
 import com.miradio.app.data.repository.PreferencesRepository
 import com.miradio.app.data.repository.StationRepository
@@ -19,6 +28,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 private const val TAG = "PlaybackService"
+private const val NOTIFICATION_ID = 1001
+private const val CHANNEL_ID = "miradio_playback"
 
 /**
  * Servicio en primer plano que mantiene viva la reproducción cuando la app
@@ -42,6 +53,15 @@ class PlaybackService : MediaSessionService() {
         super.onCreate()
         DiagnosticsLog.log(this, "PlaybackService", "onCreate")
 
+        // Android exige llamar a startForeground() casi inmediatamente
+        // después de startForegroundService() (unos segundos); si el resto
+        // del arranque (CastContext, ExoPlayer, MediaSession) tarda más que
+        // eso, el sistema mata la app con ForegroundServiceDidNotStartInTimeException.
+        // Por eso publicamos aquí una notificación provisional ya mismo, y
+        // luego dejamos que Media3 la sustituya por la real con los datos
+        // de la emisora en reproducción.
+        startForegroundImmediately()
+
         val castContext = try {
             CastContext.getSharedInstance(this)
         } catch (e: Exception) {
@@ -57,6 +77,16 @@ class PlaybackService : MediaSessionService() {
         mediaSession = MediaSession.Builder(this, radioPlayer.activePlayer)
             .setId("MiRadioSession")
             .build()
+
+        // A partir de aquí, Media3 gestiona la notificación real (portada,
+        // controles) reutilizando el mismo canal e id que la provisional.
+        setMediaNotificationProvider(
+            DefaultMediaNotificationProvider.Builder(this)
+                .setChannelId(CHANNEL_ID)
+                .setChannelName(R.string.playback_channel_name)
+                .setNotificationId(NOTIFICATION_ID)
+                .build(),
+        )
 
         PlaybackServiceConnector.attach(radioPlayer)
 
@@ -99,6 +129,34 @@ class PlaybackService : MediaSessionService() {
             val currentIndex = stations.indexOfFirst { it.id == currentId }
             val next = stations[(currentIndex + 1 + stations.size) % stations.size]
             radioPlayer.playStation(next)
+        }
+    }
+
+    private fun startForegroundImmediately() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                getString(R.string.playback_channel_name),
+                NotificationManager.IMPORTANCE_LOW,
+            )
+            getSystemService<NotificationManager>()?.createNotificationChannel(channel)
+        }
+
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(getString(R.string.app_name))
+            .setOngoing(true)
+            .build()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ServiceCompat.startForeground(
+                this,
+                NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
+            )
+        } else {
+            ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, 0)
         }
     }
 

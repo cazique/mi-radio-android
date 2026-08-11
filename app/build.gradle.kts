@@ -14,7 +14,11 @@ android {
         applicationId = "com.miradio.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
+        // El número de ejecución de GitHub Actions sube solo en cada build de
+        // CI (1, 2, 3...), que es justo lo que necesita la actualización
+        // dentro de la app para saber si hay una versión más reciente. Con un
+        // valor fijo, "Buscar actualizaciones" nunca vería nada nuevo.
+        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -31,6 +35,20 @@ android {
         )
     }
 
+    signingConfigs {
+        getByName("debug") {
+            // Clave de depuración fija y compartida entre todas las
+            // compilaciones de CI (ver keystore/debug.keystore). Sin esto,
+            // cada ejecutor de GitHub Actions genera una clave aleatoria
+            // nueva y Android rechaza instalar la "actualización" por firma
+            // distinta, obligando a desinstalar la app cada vez.
+            storeFile = file("../keystore/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -43,6 +61,7 @@ android {
         debug {
             isMinifyEnabled = false
             applicationIdSuffix = ".debug"
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
@@ -78,6 +97,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.activity:activity-compose:1.9.3")
+    // FragmentActivity, requerido por MediaRouteButton (botón de Cast) para
+    // poder mostrar su diálogo de selección de dispositivo.
+    implementation("androidx.fragment:fragment-ktx:1.8.5")
 
     // Compose UI + Material 3
     implementation("androidx.compose.ui:ui")

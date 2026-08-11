@@ -15,3 +15,7 @@ app/debug/
 *.aab
 *.keystore
 *.jks
+# Clave de depuración compartida (no es secreta, es solo para builds de
+# debug de CI): hace falta fija para que las actualizaciones no pidan
+# desinstalar la app cada vez que cambia de máquina de compilación.
+!keystore/debug.keystore
