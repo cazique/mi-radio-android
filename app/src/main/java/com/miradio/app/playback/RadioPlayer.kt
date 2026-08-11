@@ -123,7 +123,16 @@ class RadioPlayer(
         DiagnosticsLog.log(context, "RadioPlayer", "switchTo($device, $castDeviceName)")
         val previousPlayer = activePlayer
         val station = currentStation
-        val wasPlaying = previousPlayer.isPlaying
+        // OJO: no usar previousPlayer.isPlaying aquí. isPlaying solo es true
+        // en STATE_READY; si el Cast se conecta justo durante un pequeño
+        // rebuffering del stream (algo normal en radio en directo),
+        // isPlaying da false aunque el usuario tuviera la radio sonando, y
+        // el altavoz se queda con la emisora cargada pero sin arrancar
+        // hasta que el usuario pausa y vuelve a dar a play a mano.
+        // playWhenReady refleja la intención del usuario (play/pausa) sin
+        // verse afectado por esos baches de buffering, así que es el valor
+        // correcto para decidir si el nuevo reproductor debe arrancar solo.
+        val wasPlaying = previousPlayer.playWhenReady
         val position = if (device == OutputDevice.CAST) 0L else previousPlayer.currentPosition
 
         // ExoPlayer (móvil) y CastPlayer son objetos independientes: cambiar
