@@ -8,7 +8,9 @@
       "logoUrl": "https://graph.facebook.com/copemadrid/picture?width=200&height=200",
       "description": "Emisora de Cadena COPE para Madrid (106.3 FM). Stream oficial servido por la CDN de Flumotion que usa cope.es/directos/madrid.",
       "category": "Generalista",
-      "isAvailable": true
+      "region": "Comunidad de Madrid",
+      "isAvailable": true,
+      "isFavorite": true
     },
     {
       "id": "cope_la_baneza",
@@ -18,7 +20,9 @@
       "logoUrl": "https://graph.facebook.com/cope.leon/picture?width=200&height=200",
       "description": "COPE La Bañeza no publica un stream propio independiente; se usa el stream regional de COPE León (cope.es/directos/leon), la sede de referencia para la provincia. Sustituye esta URL si dispones del stream exacto de la sede local.",
       "category": "Generalista",
-      "isAvailable": true
+      "region": "Castilla y León",
+      "isAvailable": true,
+      "isFavorite": true
     }
   ]
 }

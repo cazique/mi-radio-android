@@ -21,31 +21,37 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 
-private val presetsMinutes = listOf(5, 15, 30, 45, 60)
+private val presetsSeconds = listOf(0, 1, 2, 3, 4, 5, 10, 30)
 private const val CUSTOM = -1
 
+/** Retardo del directo, pensado para sincronizar la radio con la tele
+ *  (p. ej. un partido de fútbol) sin que se adelante el comentario. */
 @Composable
-fun SleepTimerDialog(onDismiss: () -> Unit, onConfirm: (minutes: Int) -> Unit) {
-    var selected by remember { mutableIntStateOf(15) }
-    var customText by remember { mutableStateOf("") }
-    val customMinutes = customText.toIntOrNull()
-    val isCustomValid = customMinutes != null && customMinutes > 0
+fun DelayDialog(currentSeconds: Int, onDismiss: () -> Unit, onConfirm: (seconds: Int) -> Unit) {
+    val startsCustom = currentSeconds !in presetsSeconds
+    var selected by remember { mutableIntStateOf(if (startsCustom) CUSTOM else currentSeconds) }
+    var customText by remember { mutableStateOf(if (startsCustom) currentSeconds.toString() else "") }
+    val customSeconds = customText.toIntOrNull()
+    val isCustomValid = customSeconds != null && customSeconds in 0..300
     val canConfirm = selected != CUSTOM || isCustomValid
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Apagar la radio en…") },
+        title = { Text("Retardo del directo") },
         text = {
             LazyColumn {
-                items(presetsMinutes) { minutes ->
+                items(presetsSeconds) { seconds ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        RadioButton(selected = selected == minutes, onClick = { selected = minutes })
-                        Text("$minutes minutos", modifier = Modifier.padding(start = 8.dp))
+                        RadioButton(selected = selected == seconds, onClick = { selected = seconds })
+                        Text(
+                            text = if (seconds == 0) "Sin retardo (directo real)" else "$seconds segundos",
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
                     }
                 }
                 item {
@@ -60,13 +66,13 @@ fun SleepTimerDialog(onDismiss: () -> Unit, onConfirm: (minutes: Int) -> Unit) {
                         OutlinedTextField(
                             value = customText,
                             onValueChange = {
-                                customText = it.filter { c -> c.isDigit() }.take(4)
+                                customText = it.filter { c -> c.isDigit() }.take(3)
                                 selected = CUSTOM
                             },
                             modifier = Modifier.padding(end = 4.dp),
                             singleLine = true,
                             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
-                            suffix = { Text("min") },
+                            suffix = { Text("s") },
                         )
                     }
                 }
@@ -74,9 +80,9 @@ fun SleepTimerDialog(onDismiss: () -> Unit, onConfirm: (minutes: Int) -> Unit) {
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(if (selected == CUSTOM) customMinutes ?: 0 else selected) },
+                onClick = { onConfirm(if (selected == CUSTOM) customSeconds ?: 0 else selected) },
                 enabled = canConfirm,
-            ) { Text("Aceptar") }
+            ) { Text("Aplicar") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancelar") }

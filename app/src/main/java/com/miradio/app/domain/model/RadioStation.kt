@@ -29,4 +29,6 @@ data class RadioStation(
     val isAvailable: Boolean = true,
     val source: StationSource = StationSource.LOCAL,
     val sortOrder: Int = 0,
+    /** Comunidad autónoma (o "Nacional"), usada para agrupar el catálogo grande. */
+    val region: String? = null,
 )

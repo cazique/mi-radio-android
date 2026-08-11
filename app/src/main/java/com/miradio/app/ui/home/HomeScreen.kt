@@ -1,5 +1,6 @@
 package com.miradio.app.ui.home
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Circle
@@ -22,12 +24,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -41,7 +45,7 @@ import com.miradio.app.ui.components.CastButton
 import com.miradio.app.ui.components.PlayerCard
 import com.miradio.app.ui.components.StationListItem
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
     showFavoritesOnly: Boolean,
@@ -115,14 +119,7 @@ fun HomeScreen(
                     placeholder = { Text(stringResource(R.string.home_search_hint)) },
                     leadingIcon = { Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.cd_search)) },
                     singleLine = true,
-                )
-            }
-
-            item {
-                Text(
-                    text = if (showFavoritesOnly) stringResource(R.string.home_favorites) else stringResource(R.string.home_my_stations),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    shape = RoundedCornerShape(28.dp),
                 )
             }
 
@@ -139,21 +136,88 @@ fun HomeScreen(
                 }
             }
 
-            items(state.visibleStations, key = { it.id }) { station ->
-                StationListItem(
-                    station = station,
-                    isPlaying = state.player.station?.id == station.id,
-                    onClick = { viewModel.onStationClick(station) },
-                    onFavoriteClick = { viewModel.onFavoriteToggle(station) },
-                    // El catálogo remoto se administra editando el JSON remoto, no
-                    // desde la app; SEED y LOCAL sí son editables a mano (p. ej. para
-                    // corregir la URL provisional de COPE La Bañeza si consigues la
-                    // exacta de la sede local).
-                    onEditClick = if (station.source != com.miradio.app.domain.model.StationSource.REMOTE) {
-                        { onEditStation(station) }
-                    } else null,
-                )
+            // Con el catálogo nacional (cientos de emisoras) hace falta agrupar;
+            // en búsqueda o en la pestaña de favoritos se deja la lista plana,
+            // que ya es corta por sí sola.
+            val isBrowsingAll = state.searchQuery.isBlank() && !showFavoritesOnly
+            if (isBrowsingAll) {
+                val groups = remember(state.visibleStations) {
+                    state.visibleStations
+                        .groupBy { it.region?.takeIf { r -> r.isNotBlank() } ?: "Otras emisoras" }
+                        .toList()
+                        .sortedBy { (region, _) -> if (region == "Nacional") "" else region }
+                }
+                groups.forEach { (region, stationsInRegion) ->
+                    stickyHeader(key = region) {
+                        RegionHeader(region = region, count = stationsInRegion.size)
+                    }
+                    items(stationsInRegion, key = { it.id }) { station ->
+                        StationListItem(
+                            station = station,
+                            isPlaying = state.player.station?.id == station.id,
+                            onClick = { viewModel.onStationClick(station) },
+                            onFavoriteClick = { viewModel.onFavoriteToggle(station) },
+                            onEditClick = editActionFor(station, onEditStation),
+                            modifier = Modifier.padding(horizontal = 8.dp),
+                        )
+                    }
+                }
+            } else {
+                item {
+                    Text(
+                        text = if (showFavoritesOnly) stringResource(R.string.home_favorites) else stringResource(R.string.home_my_stations),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+                items(state.visibleStations, key = { it.id }) { station ->
+                    StationListItem(
+                        station = station,
+                        isPlaying = state.player.station?.id == station.id,
+                        onClick = { viewModel.onStationClick(station) },
+                        onFavoriteClick = { viewModel.onFavoriteToggle(station) },
+                        onEditClick = editActionFor(station, onEditStation),
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                    )
+                }
             }
+        }
+    }
+}
+
+/** El catálogo remoto se administra editando el JSON remoto, no desde la app;
+ *  SEED y LOCAL sí son editables a mano (p. ej. para corregir la URL
+ *  provisional de COPE La Bañeza si consigues la exacta de la sede local). */
+private fun editActionFor(station: RadioStation, onEditStation: (RadioStation) -> Unit): (() -> Unit)? =
+    if (station.source != com.miradio.app.domain.model.StationSource.REMOTE) {
+        { onEditStation(station) }
+    } else {
+        null
+    }
+
+@Composable
+private fun RegionHeader(region: String, count: Int) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = region,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                text = count.toString(),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

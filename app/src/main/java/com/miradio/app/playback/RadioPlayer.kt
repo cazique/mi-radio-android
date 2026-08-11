@@ -9,12 +9,14 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import com.google.android.gms.cast.framework.CastContext
 import com.miradio.app.domain.model.OutputDevice
 import com.miradio.app.domain.model.PlaybackStatus
 import com.miradio.app.domain.model.PlayerUiState
 import com.miradio.app.domain.model.RadioStation
+import com.miradio.app.util.DiagnosticsLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -38,7 +40,8 @@ class RadioPlayer(
     private val context: Context,
     private val castContext: CastContext?,
 ) {
-    val localPlayer: ExoPlayer = ExoPlayer.Builder(context).build()
+    var localPlayer: ExoPlayer = buildLocalPlayer(0)
+        private set
 
     private val castPlayer: CastPlayer? = castContext?.let { CastPlayer(it) }
 
@@ -66,6 +69,7 @@ class RadioPlayer(
 
         override fun onPlayerError(error: PlaybackException) {
             Log.w(TAG, "Playback error: ${error.errorCodeName}", error)
+            DiagnosticsLog.logThrowable(context, "RadioPlayer", "onPlayerError (${error.errorCodeName})", error)
             val playbackError = mapExoError(error)
             _uiState.update { it.copy(status = PlaybackStatus.ERROR, errorMessage = playbackError.messageKey) }
         }
@@ -87,6 +91,7 @@ class RadioPlayer(
 
     private fun switchTo(newPlayer: Player, device: OutputDevice, castDeviceName: String?) {
         if (newPlayer === activePlayer) return
+        DiagnosticsLog.log(context, "RadioPlayer", "switchTo($device, $castDeviceName)")
         val previousPlayer = activePlayer
         val station = currentStation
         val wasPlaying = previousPlayer.isPlaying
@@ -103,6 +108,55 @@ class RadioPlayer(
         }
     }
 
+    /**
+     * ExoPlayer no permite cambiar el [androidx.media3.exoplayer.LoadControl]
+     * de una instancia ya creada, así que "retrasar" el directo se consigue
+     * reconstruyendo el reproductor local con un búfer de arranque igual al
+     * retardo deseado: al reproducir a velocidad normal mientras se sigue
+     * ingiriendo el stream (que llega a ritmo real, no más rápido), ese
+     * desfase se mantiene constante mientras dure la escucha.
+     */
+    private fun buildLocalPlayer(delaySeconds: Int): ExoPlayer {
+        val delayMs = delaySeconds.coerceIn(0, 300) * 1_000
+        val bufferForPlaybackMs = (2_500).coerceAtLeast(delayMs)
+        val minBufferMs = (50_000).coerceAtLeast(bufferForPlaybackMs + 10_000)
+        val maxBufferMs = minBufferMs + 20_000
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(minBufferMs, maxBufferMs, bufferForPlaybackMs, bufferForPlaybackMs)
+            .build()
+        return ExoPlayer.Builder(context)
+            .setLoadControl(loadControl)
+            .build()
+    }
+
+    /**
+     * Cambia el retardo del directo en el móvil. No afecta a Cast, que usa su
+     * propio buffer en el dispositivo receptor. Reconstruye el reproductor
+     * local (breve recorte de audio, como al cambiar de emisora) y, si estaba
+     * activo, retoma la emisora que sonaba.
+     */
+    fun setPlaybackDelaySeconds(seconds: Int) {
+        val clamped = seconds.coerceIn(0, 300)
+        val wasActive = activePlayer === localPlayer
+        val station = currentStation
+        val wasPlaying = localPlayer.playWhenReady
+
+        localPlayer.removeListener(playerListener)
+        localPlayer.release()
+        localPlayer = buildLocalPlayer(clamped).apply { addListener(playerListener) }
+
+        if (wasActive) {
+            activePlayer = localPlayer
+            onActivePlayerChanged?.invoke(localPlayer)
+            if (station != null) {
+                localPlayer.setMediaItem(buildMediaItem(station))
+                localPlayer.prepare()
+                localPlayer.playWhenReady = wasPlaying
+            }
+        }
+        _uiState.update { it.copy(playbackDelaySeconds = clamped) }
+    }
+
     private fun buildMediaItem(station: RadioStation): MediaItem =
         MediaItem.Builder()
             .setMediaId(station.id)
@@ -117,6 +171,7 @@ class RadioPlayer(
             .build()
 
     fun playStation(station: RadioStation) {
+        DiagnosticsLog.log(context, "RadioPlayer", "playStation(${station.id}, ${station.streamUrl})")
         currentStation = station
         _uiState.update { it.copy(station = station, status = PlaybackStatus.BUFFERING, errorMessage = null) }
         activePlayer.setMediaItem(buildMediaItem(station))
@@ -193,6 +248,7 @@ class RadioPlayer(
     }
 
     fun release() {
+        DiagnosticsLog.log(context, "RadioPlayer", "release()")
         sleepTimerJob?.cancel()
         localPlayer.removeListener(playerListener)
         castPlayer?.removeListener(playerListener)

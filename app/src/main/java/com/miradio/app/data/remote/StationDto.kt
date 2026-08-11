@@ -26,6 +26,12 @@ data class StationDto(
     val description: String? = null,
     val category: String? = null,
     val isAvailable: Boolean = true,
+    /** Favorita por defecto la primera vez que se ve (p. ej. Madrid/León). El
+     *  usuario puede quitarla igualmente; no se vuelve a forzar salvo que el
+     *  propio catálogo remoto la marque true en cada sincronización. */
+    val isFavorite: Boolean = false,
+    /** Comunidad autónoma, para agrupar catálogos grandes. */
+    val region: String? = null,
 )
 
 fun StationDto.toDomain(source: StationSource, sortOrder: Int): RadioStation = RadioStation(
@@ -36,8 +42,9 @@ fun StationDto.toDomain(source: StationSource, sortOrder: Int): RadioStation = R
     logoUrl = logoUrl,
     description = description,
     category = category,
-    isFavorite = false,
+    isFavorite = isFavorite,
     isAvailable = isAvailable,
     source = source,
     sortOrder = sortOrder,
+    region = region,
 )

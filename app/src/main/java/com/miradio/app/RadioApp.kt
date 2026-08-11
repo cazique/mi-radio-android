@@ -11,6 +11,7 @@ import com.miradio.app.domain.usecase.RefreshRemoteStationsUseCase
 import com.miradio.app.domain.usecase.ToggleFavoriteUseCase
 import com.miradio.app.domain.usecase.UpdateStationUseCase
 import com.miradio.app.domain.usecase.ValidateStreamUrlUseCase
+import com.miradio.app.util.DiagnosticsLog
 
 /**
  * Contenedor manual de dependencias. Con el tamaño de esta app no hace
@@ -41,6 +42,8 @@ class RadioApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        DiagnosticsLog.installUncaughtExceptionLogger(this)
+        DiagnosticsLog.log(this, "App", "onCreate versión ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
         container = AppContainer(this)
     }
 }

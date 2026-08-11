@@ -5,8 +5,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -16,6 +19,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -24,14 +28,25 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.miradio.app.BuildConfig
 import com.miradio.app.R
 import com.miradio.app.domain.model.ThemeMode
+import com.miradio.app.util.DiagnosticsLog
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.util.Date
 
@@ -57,6 +72,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .verticalScroll(rememberScrollState())
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
@@ -111,6 +127,63 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+
+            Divider()
+
+            DiagnosticsSection()
+        }
+    }
+}
+
+/**
+ * Registro técnico local (nunca sale del teléfono salvo que el usuario lo
+ * copie a mano): sirve para ver qué ha pasado justo antes de un cierre
+ * inesperado sin necesidad de conectar el móvil a un ordenador.
+ */
+@Composable
+private fun DiagnosticsSection() {
+    val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
+    val scope = rememberCoroutineScope()
+    var logText by remember { mutableStateOf("") }
+    var copied by remember { mutableStateOf(false) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Diagnóstico", style = MaterialTheme.typography.titleMedium)
+        Text(
+            text = "Registro técnico local (emisora reproducida, errores de conexión y cierres inesperados). " +
+                "Si la app se cierra sola, cópialo y compártelo para poder ver qué ha pasado.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = {
+                scope.launch {
+                    logText = withContext(Dispatchers.IO) { DiagnosticsLog.readAll(context) }
+                    copied = false
+                }
+            }) { Text("Ver registro") }
+
+            OutlinedButton(
+                onClick = {
+                    scope.launch {
+                        val text = logText.ifBlank { withContext(Dispatchers.IO) { DiagnosticsLog.readAll(context) } }
+                        clipboard.setText(AnnotatedString(text))
+                        copied = true
+                    }
+                },
+            ) { Text(if (copied) "¡Copiado!" else "Copiar registro") }
+        }
+        if (logText.isNotBlank()) {
+            Text(
+                text = logText,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 260.dp)
+                    .verticalScroll(rememberScrollState()),
+            )
         }
     }
 }

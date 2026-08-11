@@ -18,6 +18,7 @@ data class StationEntity(
     val isAvailable: Boolean,
     val source: String,
     val sortOrder: Int,
+    val region: String? = null,
 )
 
 fun StationEntity.toDomain(): RadioStation = RadioStation(
@@ -32,6 +33,7 @@ fun StationEntity.toDomain(): RadioStation = RadioStation(
     isAvailable = isAvailable,
     source = runCatching { StationSource.valueOf(source) }.getOrDefault(StationSource.LOCAL),
     sortOrder = sortOrder,
+    region = region,
 )
 
 fun RadioStation.toEntity(): StationEntity = StationEntity(
@@ -46,4 +48,5 @@ fun RadioStation.toEntity(): StationEntity = StationEntity(
     isAvailable = isAvailable,
     source = source.name,
     sortOrder = sortOrder,
+    region = region,
 )

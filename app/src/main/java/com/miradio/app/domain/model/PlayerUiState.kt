@@ -23,4 +23,7 @@ data class PlayerUiState(
     /** Vive en el reproductor (servicio), no en la pantalla, para que no se
      *  pierda al navegar o si Android recrea el ViewModel. */
     val sleepTimerSecondsLeft: Int? = null,
+    /** Retardo actual (segundos) del directo en el móvil. No se aplica al
+     *  reproducir por Cast: el dispositivo Cast usa su propio buffer. */
+    val playbackDelaySeconds: Int = 0,
 )

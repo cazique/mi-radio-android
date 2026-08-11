@@ -5,7 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [StationEntity::class], version = 1, exportSchema = false)
+@Database(entities = [StationEntity::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun stationDao(): StationDao
@@ -20,7 +20,13 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "miradio.db",
-                ).build().also { instance = it }
+                )
+                    // La app está en desarrollo activo y el catálogo se puede
+                    // volver a poblar en cualquier momento (seed + sincronización
+                    // remota), así que no hace falta escribir migraciones
+                    // formales para cada cambio de esquema todavía.
+                    .fallbackToDestructiveMigration()
+                    .build().also { instance = it }
             }
     }
 }

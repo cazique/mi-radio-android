@@ -6,8 +6,10 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.google.android.gms.cast.framework.CastContext
 import com.miradio.app.data.database.AppDatabase
+import com.miradio.app.data.repository.PreferencesRepository
 import com.miradio.app.data.repository.StationRepository
 import com.miradio.app.domain.model.PlaybackStatus
+import com.miradio.app.util.DiagnosticsLog
 import com.miradio.app.widget.RadioWidgetProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,10 +35,12 @@ class PlaybackService : MediaSessionService() {
     // Repositorio propio y ligero, independiente del AppContainer de la UI,
     // que solo se usa para resolver "siguiente emisora" desde el widget.
     private val stationRepository by lazy { StationRepository(this, AppDatabase.getInstance(this).stationDao()) }
+    private val preferencesRepository by lazy { PreferencesRepository(this) }
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     override fun onCreate() {
         super.onCreate()
+        DiagnosticsLog.log(this, "PlaybackService", "onCreate")
 
         val castContext = try {
             CastContext.getSharedInstance(this)
@@ -60,6 +64,11 @@ class PlaybackService : MediaSessionService() {
             radioPlayer.uiState.collect { state ->
                 RadioWidgetProvider.updateAll(this@PlaybackService, state.station?.name, state.status)
             }
+        }
+
+        serviceScope.launch {
+            val storedDelay = preferencesRepository.playbackDelaySeconds.first()
+            if (storedDelay > 0) radioPlayer.setPlaybackDelaySeconds(storedDelay)
         }
     }
 
@@ -96,19 +105,24 @@ class PlaybackService : MediaSessionService() {
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession = mediaSession
 
     override fun onTaskRemoved(rootIntent: Intent?) {
+        DiagnosticsLog.log(this, "PlaybackService", "onTaskRemoved")
         // Si no está sonando nada cuando se cierra la app desde "recientes",
         // no tiene sentido mantener el servicio ni la notificación con vida.
-        if (!radioPlayer.activePlayer.playWhenReady || radioPlayer.activePlayer.mediaItemCount == 0) {
+        if (!::radioPlayer.isInitialized ||
+            !radioPlayer.activePlayer.playWhenReady ||
+            radioPlayer.activePlayer.mediaItemCount == 0
+        ) {
             stopSelf()
         }
         super.onTaskRemoved(rootIntent)
     }
 
     override fun onDestroy() {
+        DiagnosticsLog.log(this, "PlaybackService", "onDestroy")
         PlaybackServiceConnector.detach()
         serviceScope.cancel()
-        mediaSession.release()
-        radioPlayer.release()
+        if (::mediaSession.isInitialized) mediaSession.release()
+        if (::radioPlayer.isInitialized) radioPlayer.release()
         super.onDestroy()
     }
 

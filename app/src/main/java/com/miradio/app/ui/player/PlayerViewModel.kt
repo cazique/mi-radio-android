@@ -84,6 +84,13 @@ class PlayerViewModel(
         PlaybackServiceConnector.player.value?.cancelSleepTimer()
     }
 
+    /** Retardo del directo en el móvil (no afecta a Cast). Se persiste para
+     *  que se reaplique la próxima vez que arranque el servicio. */
+    fun setPlaybackDelaySeconds(seconds: Int) {
+        PlaybackServiceConnector.player.value?.setPlaybackDelaySeconds(seconds)
+        viewModelScope.launch { container.preferencesRepository.setPlaybackDelaySeconds(seconds) }
+    }
+
     companion object {
         val Factory = viewModelFactory {
             initializer {

@@ -3,6 +3,7 @@ package com.miradio.app.data.repository
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -29,6 +30,7 @@ class PreferencesRepository(private val context: Context) {
         val LAST_SYNC_MILLIS = longPreferencesKey("last_sync_millis")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
+        val PLAYBACK_DELAY_SECONDS = intPreferencesKey("playback_delay_seconds")
     }
 
     val lastStationId: Flow<String?> =
@@ -52,6 +54,10 @@ class PreferencesRepository(private val context: Context) {
     }
 
     val dynamicColor: Flow<Boolean> = context.dataStore.data.map { it[Keys.DYNAMIC_COLOR] ?: true }
+
+    /** Retardo (en segundos) con el que se reproduce el directo en el móvil,
+     *  p. ej. para sincronizar la radio con una emisión de televisión. */
+    val playbackDelaySeconds: Flow<Int> = context.dataStore.data.map { it[Keys.PLAYBACK_DELAY_SECONDS] ?: 0 }
 
     suspend fun setLastStation(id: String) {
         context.dataStore.edit { it[Keys.LAST_STATION_ID] = id }
@@ -85,5 +91,9 @@ class PreferencesRepository(private val context: Context) {
 
     suspend fun setDynamicColor(enabled: Boolean) {
         context.dataStore.edit { it[Keys.DYNAMIC_COLOR] = enabled }
+    }
+
+    suspend fun setPlaybackDelaySeconds(seconds: Int) {
+        context.dataStore.edit { it[Keys.PLAYBACK_DELAY_SECONDS] = seconds.coerceIn(0, 300) }
     }
 }

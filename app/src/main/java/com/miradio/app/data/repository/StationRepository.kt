@@ -91,7 +91,10 @@ class StationRepository(
                     .filter { it.id !in protectedIds }
                     .mapIndexed { index, dto ->
                         val station = dto.toDomain(StationSource.REMOTE, index)
-                        station.copy(isFavorite = station.id in previousFavoriteIds).toEntity()
+                        // El JSON puede declarar una emisora "favorita por defecto"
+                        // (p. ej. Madrid/León); eso se respeta siempre. Si no lo
+                        // declara, se conserva lo que el usuario haya marcado a mano.
+                        station.copy(isFavorite = dto.isFavorite || station.id in previousFavoriteIds).toEntity()
                     }
                 dao.upsertAll(entities)
                 CatalogSyncResult.Success(entities.size)

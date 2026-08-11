@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -45,6 +46,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.miradio.app.R
 import com.miradio.app.domain.model.PlaybackStatus
 import com.miradio.app.ui.components.CastButton
+import com.miradio.app.ui.components.DelayDialog
 import com.miradio.app.ui.components.PlayPauseButton
 import com.miradio.app.ui.components.SleepTimerDialog
 import com.miradio.app.ui.components.StationLogo
@@ -58,6 +60,7 @@ fun PlayerScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     var showSleepTimerDialog by remember { mutableStateOf(false) }
+    var showDelayDialog by remember { mutableStateOf(false) }
     val station = state.player.station
     val isPlaying = state.player.status == PlaybackStatus.PLAYING
 
@@ -176,6 +179,9 @@ fun PlayerScreen(
                         tint = if (station?.isFavorite == true) MaterialTheme.colorScheme.secondary else Color.White,
                     )
                 }
+                IconButton(onClick = { showDelayDialog = true }, enabled = station != null) {
+                    Icon(Icons.Filled.Timer, contentDescription = "Retardo del directo", tint = Color.White)
+                }
                 IconButton(onClick = { showSleepTimerDialog = true }) {
                     Icon(Icons.Filled.Bedtime, contentDescription = stringResource(R.string.player_sleep_timer), tint = Color.White)
                 }
@@ -187,6 +193,14 @@ fun PlayerScreen(
             state.player.sleepTimerSecondsLeft?.let { seconds ->
                 Text(
                     text = stringResource(R.string.player_sleep_timer_active, seconds / 60, seconds % 60),
+                    color = Color(0xFFB0B0BC),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+
+            if (state.player.playbackDelaySeconds > 0 && state.player.outputDevice != com.miradio.app.domain.model.OutputDevice.CAST) {
+                Text(
+                    text = "Retardo: ${state.player.playbackDelaySeconds} s",
                     color = Color(0xFFB0B0BC),
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -210,6 +224,17 @@ fun PlayerScreen(
             onConfirm = { minutes ->
                 viewModel.startSleepTimer(minutes * 60)
                 showSleepTimerDialog = false
+            },
+        )
+    }
+
+    if (showDelayDialog) {
+        DelayDialog(
+            currentSeconds = state.player.playbackDelaySeconds,
+            onDismiss = { showDelayDialog = false },
+            onConfirm = { seconds ->
+                viewModel.setPlaybackDelaySeconds(seconds)
+                showDelayDialog = false
             },
         )
     }

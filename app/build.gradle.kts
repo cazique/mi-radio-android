@@ -27,7 +27,7 @@ android {
         buildConfigField(
             "String",
             "DEFAULT_REMOTE_STATIONS_URL",
-            "\"https://raw.githubusercontent.com/cazique/mi-radio-android/main/remote-example/stations-remote-example.json\""
+            "\"https://raw.githubusercontent.com/cazique/mi-radio-android/main/remote-example/stations-espana-completo.json\""
         )
     }
 
