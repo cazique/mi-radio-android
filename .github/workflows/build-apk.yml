@@ -17,6 +17,11 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # "secrets" no se puede usar directamente en un "if:" de step (GitHub
+      # Actions lo prohíbe), así que lo volcamos primero a una variable de
+      # entorno del job y comprobamos esa variable en los "if:" de abajo.
+      HAS_RELEASE_SIGNING: ${{ secrets.RELEASE_KEYSTORE_BASE64 != '' }}
     steps:
       - name: Descargar el código
         uses: actions/checkout@v4
@@ -59,11 +64,11 @@ jobs:
       # > Actions). Sin ese secret, este paso y los siguientes se saltan y
       # el workflow sigue publicando únicamente el debug de siempre.
       - name: Preparar el keystore de release desde el secret
-        if: ${{ secrets.RELEASE_KEYSTORE_BASE64 != '' }}
+        if: ${{ env.HAS_RELEASE_SIGNING == 'true' }}
         run: echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/radio-dari-release.keystore"
 
       - name: Compilar APK de release (firmado)
-        if: ${{ secrets.RELEASE_KEYSTORE_BASE64 != '' }}
+        if: ${{ env.HAS_RELEASE_SIGNING == 'true' }}
         run: ./gradlew assembleRelease --no-daemon
         env:
           RELEASE_KEYSTORE_PATH: ${{ format('{0}/radio-dari-release.keystore', runner.temp) }}
@@ -72,14 +77,14 @@ jobs:
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
 
       - name: Guardar el APK de release como artefacto de esta ejecución
-        if: ${{ secrets.RELEASE_KEYSTORE_BASE64 != '' }}
+        if: ${{ env.HAS_RELEASE_SIGNING == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: mi-radio-release-apk
           path: app/build/outputs/apk/release/app-release.apk
 
       - name: Publicar el APK de release en una "Release" de descarga directa
-        if: ${{ secrets.RELEASE_KEYSTORE_BASE64 != '' }}
+        if: ${{ env.HAS_RELEASE_SIGNING == 'true' }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest-release
