@@ -20,4 +20,7 @@ data class PlayerUiState(
     val outputDevice: OutputDevice = OutputDevice.PHONE,
     val castDeviceName: String? = null,
     val errorMessage: String? = null,
+    /** Vive en el reproductor (servicio), no en la pantalla, para que no se
+     *  pierda al navegar o si Android recrea el ViewModel. */
+    val sleepTimerSecondsLeft: Int? = null,
 )

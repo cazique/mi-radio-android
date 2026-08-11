@@ -15,9 +15,15 @@ import com.miradio.app.domain.model.OutputDevice
 import com.miradio.app.domain.model.PlaybackStatus
 import com.miradio.app.domain.model.PlayerUiState
 import com.miradio.app.domain.model.RadioStation
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 private const val TAG = "RadioPlayer"
 
@@ -40,6 +46,8 @@ class RadioPlayer(
         private set
 
     private var currentStation: RadioStation? = null
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var sleepTimerJob: Job? = null
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState
@@ -131,6 +139,33 @@ class RadioPlayer(
     fun stop() {
         activePlayer.stop()
         _uiState.update { it.copy(status = PlaybackStatus.STOPPED) }
+        cancelSleepTimer()
+    }
+
+    /**
+     * Vive aquí (en el reproductor, dentro del servicio) y no en un ViewModel
+     * para que siga contando aunque el usuario navegue a otra pantalla o
+     * Android recree la Activity.
+     */
+    fun startSleepTimer(totalSeconds: Int) {
+        sleepTimerJob?.cancel()
+        _uiState.update { it.copy(sleepTimerSecondsLeft = totalSeconds) }
+        sleepTimerJob = scope.launch {
+            var remaining = totalSeconds
+            while (remaining > 0) {
+                delay(1_000)
+                remaining -= 1
+                _uiState.update { it.copy(sleepTimerSecondsLeft = remaining) }
+            }
+            pause()
+            _uiState.update { it.copy(sleepTimerSecondsLeft = null) }
+        }
+    }
+
+    fun cancelSleepTimer() {
+        sleepTimerJob?.cancel()
+        sleepTimerJob = null
+        _uiState.update { it.copy(sleepTimerSecondsLeft = null) }
     }
 
     private fun updateStatusFromPlayer() {
@@ -158,6 +193,7 @@ class RadioPlayer(
     }
 
     fun release() {
+        sleepTimerJob?.cancel()
         localPlayer.removeListener(playerListener)
         castPlayer?.removeListener(playerListener)
         castPlayer?.setSessionAvailabilityListener(null)

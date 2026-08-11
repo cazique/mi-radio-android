@@ -70,6 +70,12 @@ class StationRepository(
      * las que ya vinieron del catálogo remoto en una sincronización anterior
      * más las que llegan nuevas, para que quitar una emisora del JSON remoto
      * también la retire de la app.
+     *
+     * Como el id es la clave primaria en Room, una emisora remota con el
+     * mismo id que una de fábrica o añadida a mano podría "adoptar" esa fila
+     * (y luego borrarla si desaparece del JSON). Para evitarlo, cualquier id
+     * remoto que ya exista como SEED o LOCAL se ignora silenciosamente: esas
+     * fuentes siempre tienen prioridad sobre el catálogo remoto.
      */
     suspend fun syncRemoteCatalog(url: String): CatalogSyncResult = withContext(Dispatchers.IO) {
         when (val result = remoteService.fetchCatalog(url)) {
@@ -79,11 +85,14 @@ class StationRepository(
                 // antes de reemplazar el catálogo, para no perder esa marca al
                 // volver a sincronizar.
                 val previousFavoriteIds = dao.favoriteIdsBySource(StationSource.REMOTE.name).toSet()
+                val protectedIds = dao.idsExcludingSource(StationSource.REMOTE.name).toSet()
                 dao.deleteBySource(StationSource.REMOTE.name)
-                val entities = result.stations.mapIndexed { index, dto ->
-                    val station = dto.toDomain(StationSource.REMOTE, index)
-                    station.copy(isFavorite = station.id in previousFavoriteIds).toEntity()
-                }
+                val entities = result.stations
+                    .filter { it.id !in protectedIds }
+                    .mapIndexed { index, dto ->
+                        val station = dto.toDomain(StationSource.REMOTE, index)
+                        station.copy(isFavorite = station.id in previousFavoriteIds).toEntity()
+                    }
                 dao.upsertAll(entities)
                 CatalogSyncResult.Success(entities.size)
             }

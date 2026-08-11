@@ -145,7 +145,11 @@ fun HomeScreen(
                     isPlaying = state.player.station?.id == station.id,
                     onClick = { viewModel.onStationClick(station) },
                     onFavoriteClick = { viewModel.onFavoriteToggle(station) },
-                    onEditClick = if (station.source == com.miradio.app.domain.model.StationSource.LOCAL) {
+                    // El catálogo remoto se administra editando el JSON remoto, no
+                    // desde la app; SEED y LOCAL sí son editables a mano (p. ej. para
+                    // corregir la URL provisional de COPE La Bañeza si consigues la
+                    // exacta de la sede local).
+                    onEditClick = if (station.source != com.miradio.app.domain.model.StationSource.REMOTE) {
                         { onEditStation(station) }
                     } else null,
                 )

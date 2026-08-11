@@ -184,7 +184,7 @@ fun PlayerScreen(
                 }
             }
 
-            state.sleepTimerSecondsLeft?.let { seconds ->
+            state.player.sleepTimerSecondsLeft?.let { seconds ->
                 Text(
                     text = stringResource(R.string.player_sleep_timer_active, seconds / 60, seconds % 60),
                     color = Color(0xFFB0B0BC),

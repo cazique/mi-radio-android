@@ -12,9 +12,6 @@ import com.miradio.app.domain.model.RadioStation
 import com.miradio.app.playback.PlaybackController
 import com.miradio.app.playback.PlaybackServiceConnector
 import com.miradio.app.ui.util.radioApp
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -26,7 +23,6 @@ import kotlinx.coroutines.launch
 data class PlayerScreenState(
     val player: PlayerUiState = PlayerUiState(),
     val stations: List<RadioStation> = emptyList(),
-    val sleepTimerSecondsLeft: Int? = null,
 )
 
 class PlayerViewModel(
@@ -34,15 +30,11 @@ class PlayerViewModel(
     private val container: AppContainer,
 ) : AndroidViewModel(application) {
 
-    private val sleepTimerSeconds = MutableStateFlow<Int?>(null)
-    private var sleepTimerJob: Job? = null
-
     val uiState: StateFlow<PlayerScreenState> = combine(
         PlaybackServiceConnector.player.flatMapLatest { it?.uiState ?: flowOf(PlayerUiState()) },
         container.stationRepository.stations,
-        sleepTimerSeconds,
-    ) { playerState, stations, timer ->
-        PlayerScreenState(player = playerState, stations = stations, sleepTimerSecondsLeft = timer)
+    ) { playerState, stations ->
+        PlayerScreenState(player = playerState, stations = stations)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PlayerScreenState())
 
     fun onPlayPauseClick() {
@@ -54,7 +46,6 @@ class PlayerViewModel(
 
     fun onStop() {
         PlaybackServiceConnector.player.value?.stop()
-        cancelSleepTimer()
     }
 
     fun onFavoriteToggle() {
@@ -79,25 +70,18 @@ class PlayerViewModel(
         }
     }
 
+    // El temporizador de apagado vive en RadioPlayer (dentro del servicio), no
+    // aquí, para que no se pierda si el usuario cambia de pantalla o Android
+    // recrea el ViewModel: startSleepTimer/cancelSleepTimer son solo un
+    // reenvío, y su valor se lee de player.uiState.sleepTimerSecondsLeft.
+
     fun startSleepTimer(totalSeconds: Int) {
-        sleepTimerJob?.cancel()
-        sleepTimerSeconds.value = totalSeconds
-        sleepTimerJob = viewModelScope.launch {
-            var remaining = totalSeconds
-            while (remaining > 0) {
-                delay(1_000)
-                remaining -= 1
-                sleepTimerSeconds.value = remaining
-            }
-            PlaybackServiceConnector.player.value?.pause()
-            sleepTimerSeconds.value = null
-        }
+        val player = PlaybackServiceConnector.player.value ?: return
+        player.startSleepTimer(totalSeconds)
     }
 
     fun cancelSleepTimer() {
-        sleepTimerJob?.cancel()
-        sleepTimerJob = null
-        sleepTimerSeconds.value = null
+        PlaybackServiceConnector.player.value?.cancelSleepTimer()
     }
 
     companion object {
