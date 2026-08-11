@@ -4,5 +4,5 @@
     <color name="widget_text">#FFFFFF</color>
 
     <!-- Crema de fondo del logotipo (Radio Dari), usado como fondo del icono adaptativo. -->
-    <color name="ic_launcher_background">#FDF6ED</color>
+    <color name="ic_launcher_background">#FDF7EA</color>
 </resources>

@@ -40,7 +40,11 @@ private val DarkColors = darkColorScheme(
 @Composable
 fun MiRadioTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
-    dynamicColor: Boolean = true,
+    // El color dinámico de Android 12+ (Material You) sustituye la paleta de
+    // marca por una generada a partir del fondo de pantalla del usuario; con
+    // el logotipo nuevo queremos que la app se vea siempre con sus propios
+    // colores (azul/naranja/crema), así que va desactivado por defecto.
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val systemDark = isSystemInDarkTheme()

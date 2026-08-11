@@ -2,14 +2,16 @@ package com.miradio.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Paleta principal: azul profundo (radio/noche) + naranja cálido de acento (encendido/play)
-val RadioBluePrimary = Color(0xFF2F5EFF)
-val RadioBluePrimaryDark = Color(0xFFB8C7FF)
-val RadioOrangeAccent = Color(0xFFFF7A33)
+// Paleta tomada directamente del logotipo de Radio Dari: azul de la radio,
+// naranja del corazón/play, y el crema de fondo del propio icono.
+val RadioBluePrimary = Color(0xFF033CB8)
+val RadioBluePrimaryDark = Color(0xFFAEC2FF)
+val RadioOrangeAccent = Color(0xFFFD621A)
+val RadioCream = Color(0xFFFDF7EA)
 
-val LightBackground = Color(0xFFFBFAFF)
+val LightBackground = RadioCream
 val LightSurface = Color(0xFFFFFFFF)
-val LightSurfaceVariant = Color(0xFFE6E6F0)
+val LightSurfaceVariant = Color(0xFFF3E9D6)
 val LightOnBackground = Color(0xFF1B1B1F)
 
 val DarkBackground = Color(0xFF121218)
