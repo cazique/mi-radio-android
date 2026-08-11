@@ -34,6 +34,7 @@ class PreferencesRepository(private val context: Context) {
         val PLAYBACK_DELAY_SECONDS = intPreferencesKey("playback_delay_seconds")
         val TEXT_SCALE = floatPreferencesKey("text_scale")
         val RECENT_STATION_IDS = stringPreferencesKey("recent_station_ids")
+        val DEBUG_MODE = booleanPreferencesKey("debug_mode")
     }
 
     val lastStationId: Flow<String?> =
@@ -71,6 +72,11 @@ class PreferencesRepository(private val context: Context) {
     val recentStationIds: Flow<List<String>> = context.dataStore.data.map { prefs ->
         prefs[Keys.RECENT_STATION_IDS]?.split(',')?.filter { it.isNotBlank() } ?: emptyList()
     }
+
+    /** Muestra u oculta el bloque de "Diagnóstico" (registro técnico interno)
+     *  en Ajustes. Activado por defecto mientras la app está en pruebas; se
+     *  puede desactivar para un uso normal, sin texto técnico a la vista. */
+    val debugMode: Flow<Boolean> = context.dataStore.data.map { it[Keys.DEBUG_MODE] ?: true }
 
     suspend fun setLastStation(id: String) {
         context.dataStore.edit { it[Keys.LAST_STATION_ID] = id }
@@ -112,6 +118,10 @@ class PreferencesRepository(private val context: Context) {
 
     suspend fun setTextScale(scale: Float) {
         context.dataStore.edit { it[Keys.TEXT_SCALE] = scale.coerceIn(0.8f, 1.6f) }
+    }
+
+    suspend fun setDebugMode(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.DEBUG_MODE] = enabled }
     }
 
     /** Añade [id] al principio del historial de "últimas escuchadas",

@@ -26,6 +26,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -141,7 +142,11 @@ fun SettingsScreen(
 
             UpdateSection()
 
-            DiagnosticsSection()
+            DebugModeSection(enabled = state.debugMode, onEnabledChange = viewModel::onDebugModeChange)
+
+            if (state.debugMode) {
+                DiagnosticsSection()
+            }
         }
     }
 }
@@ -213,6 +218,32 @@ private fun UpdateSection() {
             )
             null -> Unit
         }
+    }
+}
+
+/**
+ * Interruptor para mostrar u ocultar el bloque de "Diagnóstico" (registro
+ * técnico interno, pensado para detectar fallos durante las pruebas). Para
+ * un uso normal de la app, sobre todo pensada para gente que no está
+ * familiarizada con términos técnicos, mejor mantenerlo oculto.
+ */
+@Composable
+private fun DebugModeSection(enabled: Boolean, onEnabledChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.padding(end = 16.dp)) {
+            Text("Modo depuración", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "Muestra el registro técnico interno más abajo. Actívalo solo si vas a " +
+                    "diagnosticar un problema; para el uso normal es mejor dejarlo apagado.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = enabled, onCheckedChange = onEnabledChange)
     }
 }
 

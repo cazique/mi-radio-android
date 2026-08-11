@@ -7,6 +7,7 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -118,7 +119,16 @@ private fun MiRadioApp() {
     Scaffold(
         bottomBar = { if (showBottomBar) RadioBottomBar(navController) },
     ) { padding ->
-        Box(modifier = Modifier.padding(bottom = if (showBottomBar) padding.calculateBottomPadding() else 0.dp)) {
+        // fillMaxSize() es imprescindible aquí: sin él, este Box no tenía
+        // garantizado ocupar toda el área que le reserva el Scaffold exterior,
+        // lo que en algunas pantallas (p. ej. Ajustes, que a su vez tiene su
+        // propio Scaffold interno) podía dejar la barra inferior mal medida
+        // y sus botones de Inicio/Favoritos sin responder al toque.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = if (showBottomBar) padding.calculateBottomPadding() else 0.dp),
+        ) {
             RadioNavHost(navController)
         }
     }

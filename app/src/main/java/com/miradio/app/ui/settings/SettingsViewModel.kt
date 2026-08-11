@@ -24,6 +24,7 @@ data class SettingsUiState(
     val syncMessage: String? = null,
     val syncFailed: Boolean = false,
     val textScale: Float = 1f,
+    val debugMode: Boolean = true,
 )
 
 class SettingsViewModel(
@@ -51,6 +52,8 @@ class SettingsViewModel(
         )
     }.combine(container.preferencesRepository.textScale) { state, scale ->
         state.copy(textScale = scale)
+    }.combine(container.preferencesRepository.debugMode) { state, debug ->
+        state.copy(debugMode = debug)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
     fun onThemeModeChange(mode: ThemeMode) {
@@ -59,6 +62,10 @@ class SettingsViewModel(
 
     fun onTextScaleChange(scale: Float) {
         viewModelScope.launch { container.preferencesRepository.setTextScale(scale) }
+    }
+
+    fun onDebugModeChange(enabled: Boolean) {
+        viewModelScope.launch { container.preferencesRepository.setDebugMode(enabled) }
     }
 
     fun onRemoteUrlChange(url: String) {
