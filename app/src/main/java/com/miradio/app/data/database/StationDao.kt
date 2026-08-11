@@ -42,6 +42,13 @@ interface StationDao {
     @Query("SELECT id FROM stations WHERE source = :source AND isFavorite = 1")
     suspend fun favoriteIdsBySource(source: String): List<String>
 
+    /** IDs de [source] ya presentes antes de una sincronización, para poder
+     *  distinguir "emisora nueva" (aplica el favorito por defecto del
+     *  catálogo) de "emisora ya conocida" (se respeta lo que decidió el
+     *  usuario, sin que el catálogo remoto pueda revertirlo). */
+    @Query("SELECT id FROM stations WHERE source = :source")
+    suspend fun idsBySource(source: String): List<String>
+
     /** IDs que NO pertenecen a [source]. Se usa para que el catálogo remoto nunca
      *  pueda pisar (por id duplicado) una emisora de fábrica o añadida a mano. */
     @Query("SELECT id FROM stations WHERE source != :source")

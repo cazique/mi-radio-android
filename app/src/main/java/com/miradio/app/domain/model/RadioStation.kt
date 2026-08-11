@@ -31,4 +31,9 @@ data class RadioStation(
     val sortOrder: Int = 0,
     /** Comunidad autónoma (o "Nacional"), usada para agrupar el catálogo grande. */
     val region: String? = null,
+    /** Tipo MIME del stream (p. ej. "audio/aac", "application/x-mpegURL"), por
+     *  si el catálogo lo conoce con certeza. Si es nulo, se infiere por la
+     *  extensión de la URL (ver RadioPlayer.guessStreamMimeType), que es una
+     *  heurística razonable pero no siempre acertada. */
+    val mimeType: String? = null,
 )

@@ -188,7 +188,7 @@ class RadioPlayer(
         MediaItem.Builder()
             .setMediaId(station.id)
             .setUri(Uri.parse(station.streamUrl))
-            .setMimeType(guessStreamMimeType(station.streamUrl))
+            .setMimeType(station.mimeType?.takeIf { it.isNotBlank() } ?: guessStreamMimeType(station.streamUrl))
             .setMediaMetadata(
                 MediaMetadata.Builder()
                     .setTitle(station.name)

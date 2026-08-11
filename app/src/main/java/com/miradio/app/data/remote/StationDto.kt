@@ -26,12 +26,16 @@ data class StationDto(
     val description: String? = null,
     val category: String? = null,
     val isAvailable: Boolean = true,
-    /** Favorita por defecto la primera vez que se ve (p. ej. Madrid/León). El
-     *  usuario puede quitarla igualmente; no se vuelve a forzar salvo que el
-     *  propio catálogo remoto la marque true en cada sincronización. */
+    /** Favorita por defecto SOLO la primera vez que la app ve esta emisora
+     *  (p. ej. Madrid/León). A partir de ahí manda lo que decida el usuario:
+     *  si la desmarca, sincronizaciones posteriores ya no la vuelven a
+     *  marcar aunque este campo siga en true. */
     val isFavorite: Boolean = false,
     /** Comunidad autónoma, para agrupar catálogos grandes. */
     val region: String? = null,
+    /** Tipo MIME del stream si se conoce con certeza (p. ej. "audio/aac"); si
+     *  se omite, la app lo infiere por la extensión de la URL. */
+    val mimeType: String? = null,
 )
 
 fun StationDto.toDomain(source: StationSource, sortOrder: Int): RadioStation = RadioStation(
@@ -47,4 +51,5 @@ fun StationDto.toDomain(source: StationSource, sortOrder: Int): RadioStation = R
     source = source,
     sortOrder = sortOrder,
     region = region,
+    mimeType = mimeType,
 )

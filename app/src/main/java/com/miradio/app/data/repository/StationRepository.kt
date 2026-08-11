@@ -89,21 +89,25 @@ class StationRepository(
                         "El catálogo remoto está vacío; no se ha aplicado ningún cambio.",
                     )
                 }
-                // Recordamos qué emisoras remotas estaban marcadas como favoritas
-                // antes de reemplazar el catálogo, para no perder esa marca al
-                // volver a sincronizar.
+                // El campo "favorita" de una emisora es una decisión del usuario, no
+                // del catálogo remoto: si el JSON pudiera reimponerla en cada
+                // sincronización, desmarcar una emisora "favorita por defecto" (p. ej.
+                // COPE Madrid/León) nunca sería permanente. Por eso el catálogo remoto
+                // solo decide el valor inicial la primera vez que ve una emisora nueva;
+                // a partir de ahí se respeta siempre lo que haya elegido el usuario.
+                val previousRemoteIds = dao.idsBySource(StationSource.REMOTE.name).toSet()
                 val previousFavoriteIds = dao.favoriteIdsBySource(StationSource.REMOTE.name).toSet()
                 val protectedIds = dao.idsExcludingSource(StationSource.REMOTE.name).toSet()
                 val entities = result.stations
                     .filter { it.id !in protectedIds }
                     .mapIndexed { index, dto ->
                         val station = dto.toDomain(StationSource.REMOTE, index)
-                        // El JSON puede declarar una emisora "favorita por defecto"
-                        // (p. ej. Madrid/León); eso se respeta siempre, incluso si el
-                        // usuario la había desmarcado, para que "siempre favorita"
-                        // funcione de verdad. Si no lo declara, se conserva lo que el
-                        // usuario haya marcado a mano.
-                        station.copy(isFavorite = dto.isFavorite || station.id in previousFavoriteIds).toEntity()
+                        val isFavorite = if (station.id in previousRemoteIds) {
+                            station.id in previousFavoriteIds
+                        } else {
+                            dto.isFavorite
+                        }
+                        station.copy(isFavorite = isFavorite).toEntity()
                     }
                 // Borrar+insertar en una sola transacción: si el proceso muere a
                 // mitad, la app se queda con el catálogo anterior completo, nunca
