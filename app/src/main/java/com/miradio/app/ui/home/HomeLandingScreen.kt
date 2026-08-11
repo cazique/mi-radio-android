@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Favorite
@@ -122,13 +123,15 @@ fun HomeLandingScreen(
                     .fillMaxWidth(),
             )
 
-            // No es un buscador real: es un atajo que lleva a Explorar, donde
-            // sí se puede escribir y filtrar sobre el catálogo completo.
+            // No es un campo de texto: es un botón que lleva a Explorar,
+            // donde sí se puede escribir y filtrar sobre el catálogo
+            // completo. Sin ">" al final se confundía con un buscador vacío
+            // en el que se podía tocar para escribir directamente.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .clip(RoundedCornerShape(28.dp))
+                    .clip(RoundedCornerShape(16.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant)
                     .clickable(onClick = onOpenExplore)
                     .padding(horizontal = 16.dp, vertical = 14.dp),
@@ -139,6 +142,12 @@ fun HomeLandingScreen(
                 Text(
                     text = stringResource(R.string.home_search_hint),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(
+                    Icons.Filled.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 

@@ -23,7 +23,7 @@
     <string name="home_my_stations">Mis emisoras</string>
     <string name="home_favorites">Mis favoritos</string>
     <string name="home_recent">Últimas escuchadas</string>
-    <string name="home_search_hint">Buscar emisoras…</string>
+    <string name="home_search_hint">Buscar y explorar emisoras</string>
     <string name="home_no_stations">Todavía no hay emisoras. Pulsa “Añadir emisora” para empezar.</string>
     <string name="home_add_station">Añadir emisora</string>
     <string name="home_explore_all">Explorar emisoras</string>

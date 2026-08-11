@@ -91,19 +91,19 @@ fun PlayPauseButton(status: PlaybackStatus, enabled: Boolean, onClick: () -> Uni
     FilledIconButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.size(72.dp),
+        modifier = modifier.size(88.dp),
         colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.primary),
     ) {
         when (status) {
             PlaybackStatus.BUFFERING -> CircularProgressIndicator(
-                modifier = Modifier.size(32.dp),
+                modifier = Modifier.size(40.dp),
                 color = MaterialTheme.colorScheme.onPrimary,
                 strokeWidth = 3.dp,
             )
             else -> Icon(
                 imageVector = if (status == PlaybackStatus.PLAYING) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                 contentDescription = description,
-                modifier = Modifier.size(36.dp),
+                modifier = Modifier.size(44.dp),
             )
         }
     }
