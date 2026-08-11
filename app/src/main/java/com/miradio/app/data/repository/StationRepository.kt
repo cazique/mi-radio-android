@@ -89,6 +89,27 @@ class StationRepository(
                         "El catálogo remoto está vacío; no se ha aplicado ningún cambio.",
                     )
                 }
+                // Campos imprescindibles vacíos o URLs que no son http(s) indican un
+                // JSON mal generado; mejor rechazar todo el catálogo que guardar
+                // emisoras rotas.
+                val invalidStation = result.stations.firstOrNull {
+                    it.id.isBlank() || it.name.isBlank() || it.streamUrl.isBlank() ||
+                        !(it.streamUrl.startsWith("http://") || it.streamUrl.startsWith("https://"))
+                }
+                if (invalidStation != null) {
+                    return@withContext CatalogSyncResult.Failure(
+                        "El catálogo remoto tiene una emisora inválida (id \"${invalidStation.id}\"); no se ha aplicado ningún cambio.",
+                    )
+                }
+                // Con REPLACE como estrategia de conflicto de Room, dos emisoras
+                // remotas con el mismo id en el mismo JSON harían que una se
+                // sobrescribiera silenciosamente a la otra.
+                val duplicateIds = result.stations.groupBy { it.id }.filterValues { it.size > 1 }.keys
+                if (duplicateIds.isNotEmpty()) {
+                    return@withContext CatalogSyncResult.Failure(
+                        "El catálogo remoto tiene IDs duplicados (${duplicateIds.take(3).joinToString()}); no se ha aplicado ningún cambio.",
+                    )
+                }
                 // El campo "favorita" de una emisora es una decisión del usuario, no
                 // del catálogo remoto: si el JSON pudiera reimponerla en cada
                 // sincronización, desmarcar una emisora "favorita por defecto" (p. ej.
