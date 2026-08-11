@@ -74,7 +74,14 @@ fun HomeLandingScreen(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Image(
-                            painter = painterResource(R.mipmap.ic_launcher),
+                            // OJO: no usar R.mipmap.ic_launcher aquí. En
+                            // Android 8+ ese mipmap es un icono adaptativo
+                            // (XML <adaptive-icon>), y painterResource() de
+                            // Compose no sabe cargar ese tipo de recurso:
+                            // lanza una excepción y cierra la app nada más
+                            // abrir Inicio. Por eso hay un PNG plano aparte
+                            // solo para este uso en pantalla.
+                            painter = painterResource(R.drawable.logo_radio_dari),
                             contentDescription = null,
                             modifier = Modifier
                                 .size(36.dp)
