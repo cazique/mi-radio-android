@@ -5,4 +5,14 @@
          con un tema Android plano lanza IllegalArgumentException al inflarlo
          y la app se cierra nada más abrirse. -->
     <style name="Theme.MiRadio" parent="Theme.MaterialComponents.Light.NoActionBar" />
+
+    <!-- El botón de Cast (MediaRouteButton) toma su color del tema nativo de
+         la Activity, que solo sigue el modo oscuro DEL SISTEMA. El selector
+         de tema propio de la app (Ajustes > Tema) es independiente de eso,
+         así que sin esto el icono podía quedar del color equivocado (p. ej.
+         oscuro sobre fondo oscuro, invisible) cuando el tema elegido en la
+         app no coincidía con el del sistema. Se elige uno u otro a mano en
+         CastButton según el tema que esté usando realmente la app. -->
+    <style name="Theme.MiRadio.CastLight" parent="Theme.MaterialComponents.Light.NoActionBar" />
+    <style name="Theme.MiRadio.CastDark" parent="Theme.MaterialComponents.NoActionBar" />
 </resources>

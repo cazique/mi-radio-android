@@ -5,14 +5,20 @@ import android.app.NotificationManager
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.Bundle
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.getSystemService
+import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionResult
 import com.google.android.gms.cast.framework.CastContext
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
 import com.miradio.app.R
 import com.miradio.app.data.database.AppDatabase
 import com.miradio.app.data.repository.PreferencesRepository
@@ -30,6 +36,8 @@ import kotlinx.coroutines.launch
 private const val TAG = "PlaybackService"
 private const val NOTIFICATION_ID = 1001
 private const val CHANNEL_ID = "miradio_playback"
+private const val CMD_PREVIOUS_STATION = "com.miradio.app.command.PREVIOUS_STATION"
+private const val CMD_NEXT_STATION = "com.miradio.app.command.NEXT_STATION"
 
 /**
  * Servicio en primer plano que mantiene viva la reproducción cuando la app
@@ -48,6 +56,62 @@ class PlaybackService : MediaSessionService() {
     private val stationRepository by lazy { StationRepository(this, AppDatabase.getInstance(this).stationDao()) }
     private val preferencesRepository by lazy { PreferencesRepository(this) }
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+
+    // La app no reproduce una lista/cola de Media3 (cada emisora sustituye a
+    // la anterior), así que "anterior"/"siguiente" no son los comandos
+    // estándar de la sesión (que exigen una cola real): se publican como
+    // botones personalizados en la notificación multimedia, y el reproductor
+    // del sistema (pantalla de bloqueo, coche, reloj) los ofrece igual que si
+    // lo fueran.
+    // by lazy: no se evalúan hasta el primer uso real (dentro de onCreate/
+    // onPostConnect). Como propiedades normales, llamar aquí a getString()
+    // fallaría: el sistema construye el Service antes de adjuntarle su
+    // Context (attachBaseContext), así que un inicializador de propiedad
+    // corre demasiado pronto para poder usarlo.
+    private val previousStationButton by lazy {
+        CommandButton.Builder()
+            .setDisplayName(getString(R.string.player_previous_station))
+            .setSessionCommand(SessionCommand(CMD_PREVIOUS_STATION, Bundle.EMPTY))
+            .setIconResId(android.R.drawable.ic_media_previous)
+            .build()
+    }
+
+    private val nextStationButton by lazy {
+        CommandButton.Builder()
+            .setDisplayName(getString(R.string.player_next_station))
+            .setSessionCommand(SessionCommand(CMD_NEXT_STATION, Bundle.EMPTY))
+            .setIconResId(android.R.drawable.ic_media_next)
+            .build()
+    }
+
+    private val sessionCallback = object : MediaSession.Callback {
+        override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult {
+            val sessionCommands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon()
+                .add(SessionCommand(CMD_PREVIOUS_STATION, Bundle.EMPTY))
+                .add(SessionCommand(CMD_NEXT_STATION, Bundle.EMPTY))
+                .build()
+            return MediaSession.ConnectionResult.accept(sessionCommands, MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS)
+        }
+
+        override fun onPostConnect(session: MediaSession, controller: MediaSession.ControllerInfo) {
+            if (session.isMediaNotificationController(controller)) {
+                session.setCustomLayout(controller, listOf(previousStationButton, nextStationButton))
+            }
+        }
+
+        override fun onCustomCommand(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            customCommand: SessionCommand,
+            args: Bundle,
+        ): ListenableFuture<SessionResult> {
+            when (customCommand.customAction) {
+                CMD_PREVIOUS_STATION -> handlePreviousStation()
+                CMD_NEXT_STATION -> handleNextStation()
+            }
+            return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -76,6 +140,7 @@ class PlaybackService : MediaSessionService() {
 
         mediaSession = MediaSession.Builder(this, radioPlayer.activePlayer)
             .setId("MiRadioSession")
+            .setCallback(sessionCallback)
             .build()
 
         // A partir de aquí, Media3 gestiona la notificación real (portada,
@@ -117,6 +182,18 @@ class PlaybackService : MediaSessionService() {
             radioPlayer.pause()
         } else {
             radioPlayer.play()
+        }
+    }
+
+    private fun handlePreviousStation() {
+        if (!::radioPlayer.isInitialized) return
+        serviceScope.launch {
+            val stations = stationRepository.stations.first()
+            if (stations.isEmpty()) return@launch
+            val currentId = radioPlayer.uiState.value.station?.id
+            val currentIndex = stations.indexOfFirst { it.id == currentId }
+            val previous = stations[(currentIndex - 1 + stations.size) % stations.size]
+            radioPlayer.playStation(previous)
         }
     }
 

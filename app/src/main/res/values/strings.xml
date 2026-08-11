@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Mi Radio</string>
+    <string name="app_name">Radio Dari</string>
     <string name="playback_channel_name">Reproducción de radio</string>
 
     <!-- App Actions / accesos directos (Ok Google) -->
@@ -16,7 +16,7 @@
     <string name="nav_settings">Ajustes</string>
 
     <!-- Home -->
-    <string name="home_title">MI RADIO</string>
+    <string name="home_title">RADIO DARI</string>
     <string name="home_device_this_phone">Este móvil</string>
     <string name="home_device_label">Dispositivo: %1$s</string>
     <string name="home_my_stations">Mis emisoras</string>
@@ -31,6 +31,8 @@
     <string name="player_stop">Detener</string>
     <string name="player_favorite">Favorito</string>
     <string name="player_remove_favorite">Quitar de favoritos</string>
+    <string name="player_previous_station">Emisora anterior</string>
+    <string name="player_next_station">Siguiente emisora</string>
     <string name="player_cast">Cast</string>
     <string name="player_connecting">Conectando…</string>
     <string name="player_buffering">Cargando emisora…</string>

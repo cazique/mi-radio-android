@@ -3,6 +3,7 @@ package com.miradio.app.data.repository
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -31,6 +32,7 @@ class PreferencesRepository(private val context: Context) {
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         val PLAYBACK_DELAY_SECONDS = intPreferencesKey("playback_delay_seconds")
+        val TEXT_SCALE = floatPreferencesKey("text_scale")
     }
 
     val lastStationId: Flow<String?> =
@@ -58,6 +60,11 @@ class PreferencesRepository(private val context: Context) {
     /** Retardo (en segundos) con el que se reproduce el directo en el móvil,
      *  p. ej. para sincronizar la radio con una emisión de televisión. */
     val playbackDelaySeconds: Flow<Int> = context.dataStore.data.map { it[Keys.PLAYBACK_DELAY_SECONDS] ?: 0 }
+
+    /** Escala de tamaño de texto propia de la app (1f = normal), independiente
+     *  del tamaño de letra del sistema: así el usuario puede ajustarla sin que
+     *  se sume o choque con su ajuste de accesibilidad de Android. */
+    val textScale: Flow<Float> = context.dataStore.data.map { it[Keys.TEXT_SCALE] ?: 1f }
 
     suspend fun setLastStation(id: String) {
         context.dataStore.edit { it[Keys.LAST_STATION_ID] = id }
@@ -95,5 +102,9 @@ class PreferencesRepository(private val context: Context) {
 
     suspend fun setPlaybackDelaySeconds(seconds: Int) {
         context.dataStore.edit { it[Keys.PLAYBACK_DELAY_SECONDS] = seconds.coerceIn(0, 300) }
+    }
+
+    suspend fun setTextScale(scale: Float) {
+        context.dataStore.edit { it[Keys.TEXT_SCALE] = scale.coerceIn(0.8f, 1.6f) }
     }
 }

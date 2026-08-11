@@ -10,9 +10,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
@@ -50,9 +53,19 @@ class MainActivity : FragmentActivity() {
             val themeMode by container.preferencesRepository.themeMode.collectAsState(
                 initial = com.miradio.app.domain.model.ThemeMode.SYSTEM,
             )
+            // Escala de texto propia de Ajustes, independiente del tamaño de
+            // letra del sistema: se sustituye por completo el fontScale de la
+            // densidad de Compose en vez de multiplicarlo, para que no se
+            // sume con el ajuste de accesibilidad de Android.
+            val textScale by container.preferencesRepository.textScale.collectAsState(initial = 1f)
+            val density = LocalDensity.current
 
             MiRadioTheme(themeMode = themeMode) {
-                MiRadioApp()
+                CompositionLocalProvider(
+                    LocalDensity provides Density(density.density, fontScale = textScale),
+                ) {
+                    MiRadioApp()
+                }
             }
         }
     }

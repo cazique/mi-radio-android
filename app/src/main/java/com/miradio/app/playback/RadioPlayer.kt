@@ -7,6 +7,7 @@ import androidx.media3.cast.CastPlayer
 import androidx.media3.cast.SessionAvailabilityListener
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.DefaultLoadControl
@@ -187,6 +188,7 @@ class RadioPlayer(
         MediaItem.Builder()
             .setMediaId(station.id)
             .setUri(Uri.parse(station.streamUrl))
+            .setMimeType(guessStreamMimeType(station.streamUrl))
             .setMediaMetadata(
                 MediaMetadata.Builder()
                     .setTitle(station.name)
@@ -195,6 +197,25 @@ class RadioPlayer(
                     .build(),
             )
             .build()
+
+    /**
+     * ExoPlayer detecta el formato del stream él solo con el mimeType en
+     * blanco, pero CastPlayer (androidx.media3.cast) lo exige explícito para
+     * construir el MediaQueueItem que envía al Chromecast: sin esto, al
+     * activar Cast la app entera se cerraba con
+     * "IllegalArgumentException: The item must specify its mimeType".
+     */
+    private fun guessStreamMimeType(url: String): String {
+        val path = Uri.parse(url).lastPathSegment?.lowercase().orEmpty()
+        return when {
+            path.endsWith(".m3u8") -> MimeTypes.APPLICATION_M3U8
+            path.endsWith(".aac") -> MimeTypes.AUDIO_AAC
+            path.endsWith(".ogg") || path.endsWith(".opus") -> MimeTypes.AUDIO_OGG
+            // La mayoría de streams de radio (Icecast/Shoutcast) son MP3,
+            // incluso cuando la URL no lleva extensión.
+            else -> MimeTypes.AUDIO_MPEG
+        }
+    }
 
     fun playStation(station: RadioStation) {
         DiagnosticsLog.log(context, "RadioPlayer", "playStation(${station.id}, ${station.streamUrl})")

@@ -3,6 +3,7 @@ package com.miradio.app.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Radio
@@ -36,8 +37,14 @@ fun StationLogo(logoUrl: String?, modifier: Modifier = Modifier, cornerRadius: I
             AsyncImage(
                 model = logoUrl,
                 contentDescription = stringResource(R.string.cd_station_logo),
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
+                // Fit en vez de Crop: muchos logos de emisora no son
+                // cuadrados (marca + texto debajo), así que recortarlos
+                // podía cortar el logo y descentrarlo visualmente. Con Fit
+                // se ve el logo completo, centrado dentro del hueco cuadrado.
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(8.dp),
             )
         }
     }

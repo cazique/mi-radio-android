@@ -99,7 +99,10 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            contentPadding = PaddingValues(bottom = 24.dp),
+            // Espacio suficiente para que el FloatingActionButton de "añadir"
+            // (que flota fijo sobre la esquina inferior derecha) no tape el
+            // botón de favorito de las últimas emisoras de la lista.
+            contentPadding = PaddingValues(bottom = 96.dp),
         ) {
             item {
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {

@@ -2,6 +2,8 @@ package com.miradio.app.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +18,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -52,7 +55,7 @@ import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.util.Date
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
@@ -118,6 +121,10 @@ fun SettingsScreen(
                     )
                 }
             }
+
+            Divider()
+
+            TextSizeSection(textScale = state.textScale, onTextScaleChange = viewModel::onTextScaleChange)
 
             Divider()
 
@@ -248,6 +255,34 @@ private fun DiagnosticsSection() {
                     .heightIn(max = 260.dp)
                     .verticalScroll(rememberScrollState()),
             )
+        }
+    }
+}
+
+/**
+ * Tamaño de letra propio de la app, independiente del ajuste de accesibilidad
+ * del sistema: se guarda como una escala (1f = normal) que se aplica a toda
+ * la interfaz mediante la densidad de Compose (ver MainActivity).
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TextSizeSection(textScale: Float, onTextScaleChange: (Float) -> Unit) {
+    val options = listOf(
+        0.85f to "Pequeño",
+        1f to "Normal",
+        1.15f to "Grande",
+        1.3f to "Muy grande",
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Tamaño del texto", style = MaterialTheme.typography.titleMedium)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            options.forEach { (scale, label) ->
+                FilterChip(
+                    selected = textScale == scale,
+                    onClick = { onTextScaleChange(scale) },
+                    label = { Text(label) },
+                )
+            }
         }
     }
 }
