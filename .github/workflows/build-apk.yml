@@ -53,3 +53,44 @@ jobs:
           files: app/build/outputs/apk/debug/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # El APK release firmado solo se genera si el repo tiene configurado
+      # el secret RELEASE_KEYSTORE_BASE64 (Settings > Secrets and variables
+      # > Actions). Sin ese secret, este paso y los siguientes se saltan y
+      # el workflow sigue publicando únicamente el debug de siempre.
+      - name: Preparar el keystore de release desde el secret
+        if: ${{ secrets.RELEASE_KEYSTORE_BASE64 != '' }}
+        run: echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/radio-dari-release.keystore"
+
+      - name: Compilar APK de release (firmado)
+        if: ${{ secrets.RELEASE_KEYSTORE_BASE64 != '' }}
+        run: ./gradlew assembleRelease --no-daemon
+        env:
+          RELEASE_KEYSTORE_PATH: ${{ format('{0}/radio-dari-release.keystore', runner.temp) }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+
+      - name: Guardar el APK de release como artefacto de esta ejecución
+        if: ${{ secrets.RELEASE_KEYSTORE_BASE64 != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: mi-radio-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
+
+      - name: Publicar el APK de release en una "Release" de descarga directa
+        if: ${{ secrets.RELEASE_KEYSTORE_BASE64 != '' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-release
+          name: Última compilación (firmada)
+          body: |
+            APK release firmado con la clave propia de Radio Dari, generado
+            automáticamente desde el commit ${{ github.sha }}. Este APK
+            usa un paquete distinto al debug (com.miradio.app en vez de
+            com.miradio.app.debug), así que la primera vez hay que
+            desinstalar la versión debug antes de instalar esta.
+          prerelease: false
+          files: app/build/outputs/apk/release/app-release.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

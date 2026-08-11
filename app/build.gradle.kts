@@ -50,6 +50,19 @@ android {
             keyAlias = "androiddebugkey"
             keyPassword = "android"
         }
+        // Clave de release propia (privada, nunca en el repo). Solo existe
+        // cuando CI la aporta vía variables de entorno (ver
+        // .github/workflows/build-apk.yml); en un checkout normal sin esas
+        // variables, "release" simplemente se compila sin firmar.
+        val releaseKeystorePath = System.getenv("RELEASE_KEYSTORE_PATH")
+        if (releaseKeystorePath != null) {
+            create("release") {
+                storeFile = file(releaseKeystorePath)
+                storePassword = System.getenv("RELEASE_STORE_PASSWORD")
+                keyAlias = System.getenv("RELEASE_KEY_ALIAS")
+                keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
@@ -60,6 +73,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (System.getenv("RELEASE_KEYSTORE_PATH") != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
         debug {
             isMinifyEnabled = false
