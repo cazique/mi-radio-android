@@ -81,6 +81,8 @@ fun SettingsScreen(
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
+            SectionLabel("Apariencia")
+
             Column {
                 Text(stringResource(R.string.settings_theme), style = MaterialTheme.typography.titleMedium)
                 ThemeOption(ThemeMode.SYSTEM, R.string.settings_theme_system, state.themeMode, viewModel::onThemeModeChange)
@@ -88,7 +90,10 @@ fun SettingsScreen(
                 ThemeOption(ThemeMode.DARK, R.string.settings_theme_dark, state.themeMode, viewModel::onThemeModeChange)
             }
 
+            TextSizeSection(textScale = state.textScale, onTextScaleChange = viewModel::onTextScaleChange)
+
             Divider()
+            SectionLabel("Catálogo")
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.settings_remote_catalog), style = MaterialTheme.typography.titleMedium)
@@ -123,10 +128,7 @@ fun SettingsScreen(
             }
 
             Divider()
-
-            TextSizeSection(textScale = state.textScale, onTextScaleChange = viewModel::onTextScaleChange)
-
-            Divider()
+            SectionLabel("Aplicación")
 
             Column {
                 Text(stringResource(R.string.settings_about), style = MaterialTheme.typography.titleMedium)
@@ -137,15 +139,23 @@ fun SettingsScreen(
                 )
             }
 
-            Divider()
-
             UpdateSection()
-
-            Divider()
 
             DiagnosticsSection()
         }
     }
+}
+
+/** Cabecera de sección en mayúsculas, para agrupar visualmente ajustes
+ *  relacionados (Apariencia / Catálogo / Aplicación) en vez de una lista
+ *  larga sin estructura. */
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text = text.uppercase(),
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.primary,
+    )
 }
 
 /**

@@ -13,6 +13,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import com.google.android.gms.cast.framework.CastContext
+import com.miradio.app.data.repository.PreferencesRepository
 import com.miradio.app.domain.model.OutputDevice
 import com.miradio.app.domain.model.PlaybackStatus
 import com.miradio.app.domain.model.PlayerUiState
@@ -35,12 +36,13 @@ private val RETRY_DELAYS_MS = listOf(2_000L, 5_000L, 10_000L)
  * Envuelve un [ExoPlayer] local y un [CastPlayer] y expone siempre un único
  * [Player] activo ([activePlayer]) más un [StateFlow] con el estado que la UI
  * necesita. Cuando el usuario conecta con un dispositivo Cast, la
- * reproducción salta automáticamente del móvil al altavoz sin cortar el
- * audio (se reanuda la misma emisora en el punto en que estaba).
+ * reproducción transfiere la emisora del móvil al altavoz (hay una breve
+ * transición entre reproductores, no es instantáneo).
  */
 class RadioPlayer(
     private val context: Context,
     private val castContext: CastContext?,
+    private val preferencesRepository: PreferencesRepository,
 ) {
     var localPlayer: ExoPlayer = buildLocalPlayer(0)
         private set
@@ -233,6 +235,14 @@ class RadioPlayer(
         activePlayer.setMediaItem(buildMediaItem(station))
         activePlayer.prepare()
         activePlayer.playWhenReady = true
+        // Centralizado aquí (y no en cada pantalla/comando que puede arrancar
+        // una emisora) para que "últimas escuchadas" funcione sin importar
+        // si viene de un toque en la lista, de un comando de voz o del
+        // enlace directo de Ok Google.
+        scope.launch {
+            preferencesRepository.setLastStation(station.id)
+            preferencesRepository.addRecentStation(station.id)
+        }
     }
 
     fun play() {

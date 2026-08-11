@@ -199,7 +199,7 @@ class PlaybackService : MediaSessionService() {
             null
         }
 
-        radioPlayer = RadioPlayer(this, castContext)
+        radioPlayer = RadioPlayer(this, castContext, preferencesRepository)
         radioPlayer.onActivePlayerChanged = { newPlayer -> mediaSession.player = newPlayer }
 
         mediaSession = MediaSession.Builder(this, radioPlayer.activePlayer)

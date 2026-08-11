@@ -33,6 +33,7 @@ class PreferencesRepository(private val context: Context) {
         val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         val PLAYBACK_DELAY_SECONDS = intPreferencesKey("playback_delay_seconds")
         val TEXT_SCALE = floatPreferencesKey("text_scale")
+        val RECENT_STATION_IDS = stringPreferencesKey("recent_station_ids")
     }
 
     val lastStationId: Flow<String?> =
@@ -65,6 +66,11 @@ class PreferencesRepository(private val context: Context) {
      *  del tamaño de letra del sistema: así el usuario puede ajustarla sin que
      *  se sume o choque con su ajuste de accesibilidad de Android. */
     val textScale: Flow<Float> = context.dataStore.data.map { it[Keys.TEXT_SCALE] ?: 1f }
+
+    /** IDs de las últimas emisoras escuchadas, la más reciente primero. */
+    val recentStationIds: Flow<List<String>> = context.dataStore.data.map { prefs ->
+        prefs[Keys.RECENT_STATION_IDS]?.split(',')?.filter { it.isNotBlank() } ?: emptyList()
+    }
 
     suspend fun setLastStation(id: String) {
         context.dataStore.edit { it[Keys.LAST_STATION_ID] = id }
@@ -106,5 +112,15 @@ class PreferencesRepository(private val context: Context) {
 
     suspend fun setTextScale(scale: Float) {
         context.dataStore.edit { it[Keys.TEXT_SCALE] = scale.coerceIn(0.8f, 1.6f) }
+    }
+
+    /** Añade [id] al principio del historial de "últimas escuchadas",
+     *  eliminando duplicados y quedándose solo con las 10 más recientes. */
+    suspend fun addRecentStation(id: String) {
+        context.dataStore.edit { prefs ->
+            val current = prefs[Keys.RECENT_STATION_IDS]?.split(',')?.filter { it.isNotBlank() } ?: emptyList()
+            val updated = (listOf(id) + current.filterNot { it == id }).take(10)
+            prefs[Keys.RECENT_STATION_IDS] = updated.joinToString(",")
+        }
     }
 }

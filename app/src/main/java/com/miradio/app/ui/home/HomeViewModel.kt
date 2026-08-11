@@ -31,6 +31,8 @@ data class HomeUiState(
     /** Emisora a mostrar en la tarjeta principal cuando el servicio aún no ha
      *  cargado ninguna (p. ej. justo al abrir la app): la última escuchada. */
     val lastStation: RadioStation? = null,
+    /** Últimas emisoras escuchadas, la más reciente primero. */
+    val recentStations: List<RadioStation> = emptyList(),
     val isLoading: Boolean = true,
 ) {
     val displayedStation: RadioStation? get() = player.station ?: lastStation
@@ -66,6 +68,10 @@ class HomeViewModel(
             player = playerState,
             lastStation = stations.find { it.id == lastStationId },
             isLoading = false,
+        )
+    }.combine(container.preferencesRepository.recentStationIds) { state, recentIds ->
+        state.copy(
+            recentStations = recentIds.mapNotNull { id -> state.allStations.find { it.id == id } },
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 

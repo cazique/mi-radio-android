@@ -5,14 +5,19 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Circle
@@ -48,6 +53,7 @@ import com.miradio.app.domain.model.RadioStation
 import com.miradio.app.ui.components.CastButton
 import com.miradio.app.ui.components.PlayerCard
 import com.miradio.app.ui.components.StationListItem
+import com.miradio.app.ui.components.StationLogo
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -149,6 +155,31 @@ fun HomeScreen(
                     singleLine = true,
                     shape = RoundedCornerShape(28.dp),
                 )
+            }
+
+            if (isBrowsingAll && state.recentStations.isNotEmpty()) {
+                item {
+                    Text(
+                        text = stringResource(R.string.home_recent),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(horizontal = 16.dp, top = 4.dp, bottom = 8.dp),
+                    )
+                }
+                item {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                    ) {
+                        items(state.recentStations, key = { "recent_${it.id}" }) { station ->
+                            RecentStationChip(
+                                station = station,
+                                isPlaying = state.player.station?.id == station.id,
+                                onClick = { viewModel.onStationClick(station) },
+                            )
+                        }
+                    }
+                }
+                item { Spacer(modifier = Modifier.height(8.dp)) }
             }
 
             if (state.visibleStations.isEmpty() && !state.isLoading) {
@@ -253,6 +284,27 @@ private fun RegionHeader(region: String, count: Int, expanded: Boolean, onClick:
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+@Composable
+private fun RecentStationChip(station: RadioStation, isPlaying: Boolean, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .width(72.dp)
+            .clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        StationLogo(logoUrl = station.logoUrl, modifier = Modifier.size(64.dp), cornerRadius = 16)
+        Text(
+            text = station.name,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 4.dp),
+        )
     }
 }
 
