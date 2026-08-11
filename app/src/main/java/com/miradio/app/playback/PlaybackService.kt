@@ -87,11 +87,19 @@ class PlaybackService : MediaSessionService() {
 
     private val sessionCallback = object : MediaSession.Callback {
         override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult {
-            val sessionCommands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon()
+            // Se parte SIEMPRE de lo que el propio Media3 concede por defecto
+            // (super.onConnect) y solo se añaden los dos comandos nuevos para
+            // la notificación; sustituir los comandos de reproducción por un
+            // conjunto propio (como se hacía antes) podía dejar sin
+            // play/pausa u otros controles a la notificación, la pantalla de
+            // bloqueo o Android Auto.
+            val defaultResult = super.onConnect(session, controller)
+            if (!session.isMediaNotificationController(controller)) return defaultResult
+            val sessionCommands = defaultResult.availableSessionCommands.buildUpon()
                 .add(SessionCommand(CMD_PREVIOUS_STATION, Bundle.EMPTY))
                 .add(SessionCommand(CMD_NEXT_STATION, Bundle.EMPTY))
                 .build()
-            return MediaSession.ConnectionResult.accept(sessionCommands, MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS)
+            return MediaSession.ConnectionResult.accept(sessionCommands, defaultResult.availablePlayerCommands)
         }
 
         override fun onPostConnect(session: MediaSession, controller: MediaSession.ControllerInfo) {

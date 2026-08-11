@@ -1,6 +1,7 @@
 package com.miradio.app.ui.home
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,6 +16,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Circle
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -31,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -84,6 +88,11 @@ fun HomeScreen(
         // ya es corta por sí sola. remember() debe llamarse aquí, en el cuerpo
         // @Composable de la pantalla, no dentro del builder de LazyColumn.
         val isBrowsingAll = state.searchQuery.isBlank() && !showFavoritesOnly
+        // Qué regiones están desplegadas. Con el catálogo nacional (cientos
+        // de emisoras) tenerlas todas abiertas a la vez hace la lista
+        // interminable; se recuerda aquí (por región) para poder plegar y
+        // desplegar sin perder el resto del estado de la pantalla.
+        val expandedRegions = remember { mutableStateMapOf<String, Boolean>() }
         val groups = remember(state.visibleStations, isBrowsingAll) {
             if (!isBrowsingAll) {
                 emptyList()
@@ -157,18 +166,26 @@ fun HomeScreen(
 
             if (isBrowsingAll) {
                 groups.forEach { (region, stationsInRegion) ->
+                    val expanded = expandedRegions[region] ?: true
                     stickyHeader(key = region) {
-                        RegionHeader(region = region, count = stationsInRegion.size)
-                    }
-                    items(stationsInRegion, key = { it.id }) { station ->
-                        StationListItem(
-                            station = station,
-                            isPlaying = state.player.station?.id == station.id,
-                            onClick = { viewModel.onStationClick(station) },
-                            onFavoriteClick = { viewModel.onFavoriteToggle(station) },
-                            onEditClick = editActionFor(station, onEditStation),
-                            modifier = Modifier.padding(horizontal = 8.dp),
+                        RegionHeader(
+                            region = region,
+                            count = stationsInRegion.size,
+                            expanded = expanded,
+                            onClick = { expandedRegions[region] = !expanded },
                         )
+                    }
+                    if (expanded) {
+                        items(stationsInRegion, key = { it.id }) { station ->
+                            StationListItem(
+                                station = station,
+                                isPlaying = state.player.station?.id == station.id,
+                                onClick = { viewModel.onStationClick(station) },
+                                onFavoriteClick = { viewModel.onFavoriteToggle(station) },
+                                onEditClick = editActionFor(station, onEditStation),
+                                modifier = Modifier.padding(horizontal = 8.dp),
+                            )
+                        }
                     }
                 }
             } else {
@@ -205,7 +222,7 @@ private fun editActionFor(station: RadioStation, onEditStation: (RadioStation) -
     }
 
 @Composable
-private fun RegionHeader(region: String, count: Int) {
+private fun RegionHeader(region: String, count: Int, expanded: Boolean, onClick: () -> Unit) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
         modifier = Modifier.fillMaxWidth(),
@@ -213,15 +230,23 @@ private fun RegionHeader(region: String, count: Int) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .clickable(onClick = onClick)
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = region,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Icon(
+                    imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = region,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
             Text(
                 text = count.toString(),
                 style = MaterialTheme.typography.labelLarge,

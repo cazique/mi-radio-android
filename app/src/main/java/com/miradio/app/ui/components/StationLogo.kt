@@ -21,13 +21,19 @@ import com.miradio.app.R
 
 @Composable
 fun StationLogo(logoUrl: String?, modifier: Modifier = Modifier, cornerRadius: Int = 16) {
+    val hasLogo = !logoUrl.isNullOrBlank()
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(cornerRadius.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+            // Casi todos los logos de emisora vienen con fondo blanco de
+            // fábrica; usar el gris/oscuro del tema detrás se notaba como un
+            // borde/recuadro descolocado. Blanco fijo cuando hay logo real
+            // hace que se vea como una sola pieza; el icono de "sin logo"
+            // mantiene el color del tema para no destacar de más.
+            .background(if (hasLogo) androidx.compose.ui.graphics.Color.White else MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center,
     ) {
-        if (logoUrl.isNullOrBlank()) {
+        if (!hasLogo) {
             Icon(
                 imageVector = Icons.Filled.Radio,
                 contentDescription = stringResource(R.string.cd_station_logo),
