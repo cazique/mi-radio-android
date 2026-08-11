@@ -43,7 +43,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.miradio.app.BuildConfig
 import com.miradio.app.R
 import com.miradio.app.domain.model.ThemeMode
+import com.miradio.app.util.AppUpdater
 import com.miradio.app.util.DiagnosticsLog
+import com.miradio.app.util.UpdateCheckResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -130,7 +132,69 @@ fun SettingsScreen(
 
             Divider()
 
+            UpdateSection()
+
+            Divider()
+
             DiagnosticsSection()
+        }
+    }
+}
+
+/**
+ * Descarga la última compilación publicada en GitHub y, si es más reciente
+ * que la instalada, deja instalarla con un toque, sin salir de la app.
+ * Android sigue exigiendo confirmar la instalación (y, la primera vez,
+ * permitir "instalar apps de origen desconocido" para Mi Radio): eso no se
+ * puede saltar sin un dispositivo rooteado.
+ */
+@Composable
+private fun UpdateSection() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var checking by remember { mutableStateOf(false) }
+    var result by remember { mutableStateOf<UpdateCheckResult?>(null) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Actualizaciones", style = MaterialTheme.typography.titleMedium)
+        Button(
+            onClick = {
+                checking = true
+                result = null
+                scope.launch {
+                    result = AppUpdater.checkForUpdate(context)
+                    checking = false
+                }
+            },
+            enabled = !checking,
+        ) {
+            if (checking) {
+                CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp), strokeWidth = 2.dp)
+            }
+            Text("Buscar actualizaciones")
+        }
+        when (val current = result) {
+            is UpdateCheckResult.UpdateAvailable -> {
+                Text(
+                    text = "Versión ${current.versionName ?: current.versionCode} disponible.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Button(onClick = { AppUpdater.installUpdate(context, current.apkFile) }) {
+                    Text("Instalar ahora")
+                }
+            }
+            is UpdateCheckResult.UpToDate -> Text(
+                text = "Ya tienes la última versión (${BuildConfig.VERSION_NAME}).",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            is UpdateCheckResult.Failure -> Text(
+                text = "No se ha podido comprobar: ${current.reason}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+            null -> Unit
         }
     }
 }
