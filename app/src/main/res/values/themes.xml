@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.MiRadio" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- androidx.mediarouter.app.MediaRouteButton (usado por el botón de Cast)
+         exige que el tema derive de Theme.MaterialComponents (o AppCompat);
+         con un tema Android plano lanza IllegalArgumentException al inflarlo
+         y la app se cierra nada más abrirse. -->
+    <style name="Theme.MiRadio" parent="Theme.MaterialComponents.Light.NoActionBar" />
 </resources>

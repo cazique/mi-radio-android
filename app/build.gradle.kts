@@ -91,6 +91,10 @@ dependencies {
     // Coil (logos de emisoras)
     implementation("io.coil-kt:coil-compose:2.7.0")
 
+    // Theme.MaterialComponents, requerido por androidx.mediarouter.app.MediaRouteButton
+    // (botón de Cast) para poder inflarse sin lanzar excepción.
+    implementation("com.google.android.material:material:1.12.0")
+
     // Media3 / ExoPlayer + sesión multimedia + Cast bridge
     implementation("androidx.media3:media3-exoplayer:1.4.1")
     implementation("androidx.media3:media3-exoplayer-hls:1.4.1")
