@@ -10,6 +10,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.getSystemService
+import androidx.media3.common.MediaItem
 import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
@@ -119,6 +120,60 @@ class PlaybackService : MediaSessionService() {
                 CMD_NEXT_STATION -> handleNextStation()
             }
             return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+        }
+
+        /**
+         * Se dispara con "Ok Google, reproduce <frase> en Radio Dari": es el
+         * mismo mecanismo con el que Spotify o TuneIn responden a "pon
+         * <canción> en Spotify". Android entrega la frase completa tal cual
+         * (sin analizar) en requestMetadata.searchQuery; aquí se interpreta
+         * con VoiceCommandParser para reconocer emisora y/o retardo, y se
+         * reproduce mediante el propio RadioPlayer para que el resto de la
+         * app (favoritos, widget, registro, Cast) se entere del cambio.
+         */
+        override fun onAddMediaItems(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            mediaItems: MutableList<MediaItem>,
+        ): ListenableFuture<MutableList<MediaItem>> {
+            val query = mediaItems.firstOrNull()?.requestMetadata?.searchQuery
+            if (query.isNullOrBlank() || !::radioPlayer.isInitialized) {
+                return super.onAddMediaItems(mediaSession, controller, mediaItems)
+            }
+            DiagnosticsLog.log(this@PlaybackService, "PlaybackService", "Comando de voz: \"$query\"")
+            handleVoiceCommand(query)
+            val resolved = radioPlayer.activePlayer.currentMediaItem?.let { mutableListOf(it) } ?: mediaItems
+            return Futures.immediateFuture(resolved)
+        }
+    }
+
+    private fun handleVoiceCommand(query: String) {
+        when (val command = VoiceCommandParser.parse(query)) {
+            is VoiceCommand.SetDelay -> {
+                radioPlayer.setPlaybackDelaySeconds(command.delaySeconds)
+                serviceScope.launch { preferencesRepository.setPlaybackDelaySeconds(command.delaySeconds) }
+            }
+            VoiceCommand.ClearDelay -> {
+                radioPlayer.setPlaybackDelaySeconds(0)
+                serviceScope.launch { preferencesRepository.setPlaybackDelaySeconds(0) }
+            }
+            is VoiceCommand.PlayStation -> {
+                serviceScope.launch {
+                    val stations = stationRepository.stations.first()
+                    val station = VoiceCommandParser.findBestMatch(stations, command.stationQuery)
+                    if (station != null) {
+                        radioPlayer.playStation(station)
+                        preferencesRepository.setLastStation(station.id)
+                        command.delaySeconds?.let {
+                            radioPlayer.setPlaybackDelaySeconds(it)
+                            preferencesRepository.setPlaybackDelaySeconds(it)
+                        }
+                    } else {
+                        DiagnosticsLog.log(this@PlaybackService, "PlaybackService", "Comando de voz: emisora no reconocida (\"${command.stationQuery}\")")
+                    }
+                }
+            }
+            VoiceCommand.Unrecognized -> Unit
         }
     }
 
