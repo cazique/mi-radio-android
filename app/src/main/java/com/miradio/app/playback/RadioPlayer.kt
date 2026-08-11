@@ -122,13 +122,20 @@ class RadioPlayer(
         val previousPlayer = activePlayer
         val station = currentStation
         val wasPlaying = previousPlayer.isPlaying
+        val position = if (device == OutputDevice.CAST) 0L else previousPlayer.currentPosition
+
+        // ExoPlayer (móvil) y CastPlayer son objetos independientes: cambiar
+        // cuál es "activePlayer" no detiene al anterior por sí solo. Sin esto,
+        // al pasar a Cast el teléfono seguía sonando de fondo a la vez que el
+        // altavoz.
+        previousPlayer.playWhenReady = false
+        previousPlayer.stop()
 
         activePlayer = newPlayer
         _uiState.update { it.copy(outputDevice = device, castDeviceName = castDeviceName) }
         onActivePlayerChanged?.invoke(newPlayer)
 
         if (station != null) {
-            val position = if (device == OutputDevice.CAST) 0L else previousPlayer.currentPosition
             newPlayer.setMediaItem(buildMediaItem(station), position)
             newPlayer.prepare()
             newPlayer.playWhenReady = wasPlaying
