@@ -19,7 +19,10 @@ android {
         // dentro de la app para saber si hay una versión más reciente. Con un
         // valor fijo, "Buscar actualizaciones" nunca vería nada nuevo.
         versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
-        versionName = "1.0.0"
+        // El número de build va también en el nombre visible (Ajustes > Acerca
+        // de) para poder comprobar a simple vista qué compilación tienes
+        // instalada sin mirar el registro de diagnóstico.
+        versionName = "1.0.0-build" + (System.getenv("GITHUB_RUN_NUMBER") ?: "dev")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
