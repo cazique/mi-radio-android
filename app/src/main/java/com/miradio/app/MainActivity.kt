@@ -7,6 +7,7 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
@@ -23,8 +24,10 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.miradio.app.playback.PlaybackController
+import com.miradio.app.ui.components.MiniPlayerBar
 import com.miradio.app.ui.navigation.RadioBottomBar
 import com.miradio.app.ui.navigation.RadioNavHost
+import com.miradio.app.ui.navigation.Routes
 import com.miradio.app.ui.navigation.bottomBarRoutes
 import com.miradio.app.ui.theme.MiRadioTheme
 import com.miradio.app.util.DiagnosticsLog
@@ -117,7 +120,17 @@ private fun MiRadioApp() {
     val showBottomBar = currentRoute == null || currentRoute in bottomBarRoutes
 
     Scaffold(
-        bottomBar = { if (showBottomBar) RadioBottomBar(navController) },
+        bottomBar = {
+            if (showBottomBar) {
+                Column {
+                    // Franja de "ahora suena" fija encima de la barra de
+                    // navegación, visible en Inicio/Favoritos/Explorar/Ajustes;
+                    // se oculta ella sola si todavía no ha sonado nada.
+                    MiniPlayerBar(onClick = { navController.navigate(Routes.PLAYER) })
+                    RadioBottomBar(navController)
+                }
+            }
+        },
     ) { padding ->
         // fillMaxSize() es imprescindible aquí: sin él, este Box no tenía
         // garantizado ocupar toda el área que le reserva el Scaffold exterior,

@@ -1,6 +1,7 @@
 package com.miradio.app.ui.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
@@ -21,6 +22,7 @@ private data class BottomTab(val route: String, val labelRes: Int, val icon: and
 private val tabs = listOf(
     BottomTab(Routes.HOME, R.string.nav_home, Icons.Filled.Home),
     BottomTab(Routes.FAVORITES, R.string.nav_favorites, Icons.Filled.Favorite),
+    BottomTab(Routes.EXPLORE, R.string.nav_explore, Icons.Filled.Explore),
     BottomTab(Routes.SETTINGS, R.string.nav_settings, Icons.Filled.Settings),
 )
 

@@ -5,22 +5,15 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Search
@@ -48,13 +41,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.miradio.app.R
-import com.miradio.app.domain.model.OutputDevice
 import com.miradio.app.domain.model.RadioStation
 import com.miradio.app.ui.components.CastButton
-import com.miradio.app.ui.components.PlayerCard
 import com.miradio.app.ui.components.StationListItem
-import com.miradio.app.ui.components.StationLogo
 
+/**
+ * Catálogo completo, agrupado por región y con búsqueda: es la pantalla
+ * "Explorar" cuando showFavoritesOnly es false, y "Favoritos" cuando es
+ * true. La tarjeta de "ahora suena" y "últimas escuchadas" viven en Inicio
+ * (HomeLandingScreen) y en la barra de mini-reproductor, no aquí.
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
@@ -74,7 +70,12 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.home_title), style = MaterialTheme.typography.titleLarge) },
+                title = {
+                    Text(
+                        text = stringResource(if (showFavoritesOnly) R.string.home_favorites else R.string.nav_explore),
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                },
                 actions = {
                     CastButton()
                     IconButton(onClick = onOpenSettings) {
@@ -120,30 +121,6 @@ fun HomeScreen(
             contentPadding = PaddingValues(bottom = 96.dp),
         ) {
             item {
-                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    DeviceIndicator(
-                        deviceName = if (state.player.outputDevice == OutputDevice.CAST) {
-                            state.player.castDeviceName ?: stringResource(R.string.home_device_this_phone)
-                        } else {
-                            stringResource(R.string.home_device_this_phone)
-                        },
-                    )
-                }
-            }
-
-            item {
-                PlayerCard(
-                    station = state.displayedStation,
-                    status = state.player.status,
-                    onPlayPauseClick = { viewModel.onPrimaryPlayClick(state) },
-                    onCardClick = if (state.displayedStation != null) onOpenPlayer else null,
-                    modifier = Modifier
-                        .padding(horizontal = 16.dp)
-                        .fillMaxWidth(),
-                )
-            }
-
-            item {
                 OutlinedTextField(
                     value = state.searchQuery,
                     onValueChange = viewModel::onSearchQueryChange,
@@ -155,31 +132,6 @@ fun HomeScreen(
                     singleLine = true,
                     shape = RoundedCornerShape(28.dp),
                 )
-            }
-
-            if (isBrowsingAll && state.recentStations.isNotEmpty()) {
-                item {
-                    Text(
-                        text = stringResource(R.string.home_recent),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp),
-                    )
-                }
-                item {
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                    ) {
-                        items(state.recentStations, key = { "recent_${it.id}" }) { station ->
-                            RecentStationChip(
-                                station = station,
-                                isPlaying = state.player.station?.id == station.id,
-                                onClick = { viewModel.onStationClick(station) },
-                            )
-                        }
-                    }
-                }
-                item { Spacer(modifier = Modifier.height(8.dp)) }
             }
 
             if (state.visibleStations.isEmpty() && !state.isLoading) {
@@ -284,43 +236,5 @@ private fun RegionHeader(region: String, count: Int, expanded: Boolean, onClick:
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-    }
-}
-
-@Composable
-private fun RecentStationChip(station: RadioStation, isPlaying: Boolean, onClick: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .width(72.dp)
-            .clickable(onClick = onClick),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        StationLogo(logoUrl = station.logoUrl, modifier = Modifier.size(64.dp), cornerRadius = 16)
-        Text(
-            text = station.name,
-            style = MaterialTheme.typography.labelMedium,
-            color = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 4.dp),
-        )
-    }
-}
-
-@Composable
-private fun DeviceIndicator(deviceName: String) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Icon(
-            imageVector = Icons.Filled.Circle,
-            contentDescription = null,
-            tint = com.miradio.app.ui.theme.SuccessGreen,
-            modifier = Modifier.size(10.dp),
-        )
-        Text(
-            text = stringResource(R.string.home_device_label, deviceName),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }

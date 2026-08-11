@@ -13,6 +13,7 @@
     <string name="nav_home">Inicio</string>
     <string name="nav_stations">Emisoras</string>
     <string name="nav_favorites">Favoritos</string>
+    <string name="nav_explore">Explorar</string>
     <string name="nav_settings">Ajustes</string>
 
     <!-- Home -->
@@ -25,6 +26,9 @@
     <string name="home_search_hint">Buscar emisoras…</string>
     <string name="home_no_stations">Todavía no hay emisoras. Pulsa “Añadir emisora” para empezar.</string>
     <string name="home_add_station">Añadir emisora</string>
+    <string name="home_explore_all">Explorar emisoras</string>
+    <string name="home_explore_count">%1$d emisoras</string>
+    <string name="home_favorites_count">%1$d favoritas</string>
 
     <!-- Reproductor -->
     <string name="player_play">Reproducir</string>
