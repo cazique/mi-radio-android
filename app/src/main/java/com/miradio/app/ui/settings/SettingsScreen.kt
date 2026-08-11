@@ -1,6 +1,10 @@
 package com.miradio.app.ui.settings
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -9,11 +13,25 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.BrightnessAuto
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
@@ -24,10 +42,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -38,10 +56,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.miradio.app.BuildConfig
@@ -55,6 +78,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.util.Date
+
+private val SectionPurple = Color(0xFF7C5CFC)
+private val SectionBlue = Color(0xFF3B82F6)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -80,23 +106,18 @@ fun SettingsScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
-            SectionLabel("Apariencia")
-
-            Column {
-                Text(stringResource(R.string.settings_theme), style = MaterialTheme.typography.titleMedium)
-                ThemeOption(ThemeMode.SYSTEM, R.string.settings_theme_system, state.themeMode, viewModel::onThemeModeChange)
-                ThemeOption(ThemeMode.LIGHT, R.string.settings_theme_light, state.themeMode, viewModel::onThemeModeChange)
-                ThemeOption(ThemeMode.DARK, R.string.settings_theme_dark, state.themeMode, viewModel::onThemeModeChange)
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                SectionHeader(Icons.Filled.Palette, SectionPurple, "Apariencia")
+                ThemeCardPicker(selected = state.themeMode, onSelect = viewModel::onThemeModeChange)
+                TextSizeSection(textScale = state.textScale, onTextScaleChange = viewModel::onTextScaleChange)
             }
 
-            TextSizeSection(textScale = state.textScale, onTextScaleChange = viewModel::onTextScaleChange)
-
             Divider()
-            SectionLabel("Catálogo")
 
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SectionHeader(Icons.Filled.Sync, SectionPurple, "Catálogo")
                 Text(stringResource(R.string.settings_remote_catalog), style = MaterialTheme.typography.titleMedium)
                 OutlinedTextField(
                     value = state.remoteCatalogUrl,
@@ -129,46 +150,111 @@ fun SettingsScreen(
             }
 
             Divider()
-            SectionLabel("Aplicación")
 
-            Column {
-                Text(stringResource(R.string.settings_about), style = MaterialTheme.typography.titleMedium)
-                Text(
-                    text = stringResource(R.string.settings_version, BuildConfig.VERSION_NAME),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                SectionHeader(Icons.Filled.Apps, SectionBlue, "Aplicación")
+
+                Column {
+                    Text(stringResource(R.string.settings_about), style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        text = stringResource(R.string.settings_version, BuildConfig.VERSION_NAME),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                UpdateSection()
+
+                DebugModeSection(enabled = state.debugMode, onEnabledChange = viewModel::onDebugModeChange)
             }
 
-            UpdateSection()
-
-            DebugModeSection(enabled = state.debugMode, onEnabledChange = viewModel::onDebugModeChange)
-
             if (state.debugMode) {
-                DiagnosticsSection()
+                Divider()
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SectionHeader(Icons.Filled.Shield, SectionPurple, "Diagnóstico")
+                    DiagnosticsSection()
+                }
             }
         }
     }
 }
 
-/** Cabecera de sección en mayúsculas, para agrupar visualmente ajustes
- *  relacionados (Apariencia / Catálogo / Aplicación) en vez de una lista
- *  larga sin estructura. */
+/** Insignia circular de color + título, para agrupar visualmente ajustes
+ *  relacionados en vez de una lista larga sin estructura. */
 @Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text = text.uppercase(),
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
+private fun SectionHeader(icon: ImageVector, tint: Color, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(tint.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+        }
+        Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    }
+}
+
+/** Selector de tema como tarjetas visuales (en vez de una lista de radio
+ *  buttons): más fácil de reconocer de un vistazo, sobre todo para quien no
+ *  está familiarizado con el vocabulario técnico de "modo claro/oscuro". */
+@Composable
+private fun ThemeCardPicker(selected: ThemeMode, onSelect: (ThemeMode) -> Unit) {
+    val options = listOf(
+        Triple(ThemeMode.SYSTEM, Icons.Filled.BrightnessAuto, R.string.settings_theme_system),
+        Triple(ThemeMode.LIGHT, Icons.Filled.LightMode, R.string.settings_theme_light),
+        Triple(ThemeMode.DARK, Icons.Filled.DarkMode, R.string.settings_theme_dark),
     )
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        options.forEach { (mode, icon, labelRes) ->
+            val isSelected = selected == mode
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(16.dp))
+                    .border(
+                        width = if (isSelected) 2.dp else 1.dp,
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                        shape = RoundedCornerShape(16.dp),
+                    )
+                    .clickable { onSelect(mode) }
+                    .padding(vertical = 16.dp, horizontal = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = stringResource(labelRes),
+                    style = MaterialTheme.typography.labelMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                if (isSelected) {
+                    Icon(
+                        Icons.Filled.CheckCircle,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .padding(top = 6.dp)
+                            .size(16.dp),
+                    )
+                }
+            }
+        }
+    }
 }
 
 /**
  * Descarga la última compilación publicada en GitHub y, si es más reciente
  * que la instalada, deja instalarla con un toque, sin salir de la app.
  * Android sigue exigiendo confirmar la instalación (y, la primera vez,
- * permitir "instalar apps de origen desconocido" para Mi Radio): eso no se
- * puede saltar sin un dispositivo rooteado.
+ * permitir "instalar apps de origen desconocido" para Radio Dari): eso no
+ * se puede saltar sin un dispositivo rooteado.
  */
 @Composable
 private fun UpdateSection() {
@@ -176,9 +262,15 @@ private fun UpdateSection() {
     val scope = rememberCoroutineScope()
     var checking by remember { mutableStateOf(false) }
     var result by remember { mutableStateOf<UpdateCheckResult?>(null) }
+    var showResultDialog by remember { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Actualizaciones", style = MaterialTheme.typography.titleMedium)
+        Text(
+            text = "Buscar nuevas actualizaciones de la aplicación.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Button(
             onClick = {
                 checking = true
@@ -186,38 +278,69 @@ private fun UpdateSection() {
                 scope.launch {
                     result = AppUpdater.checkForUpdate(context)
                     checking = false
+                    showResultDialog = true
                 }
             },
             enabled = !checking,
         ) {
             if (checking) {
                 CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp), strokeWidth = 2.dp)
+            } else {
+                Icon(Icons.Filled.CloudDownload, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
             }
             Text("Buscar actualizaciones")
         }
-        when (val current = result) {
-            is UpdateCheckResult.UpdateAvailable -> {
-                Text(
-                    text = "Versión ${current.versionName ?: current.versionCode} disponible.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Button(onClick = { AppUpdater.installUpdate(context, current.apkFile) }) {
-                    Text("Instalar ahora")
+    }
+
+    if (showResultDialog) {
+        val current = result
+        AlertDialog(
+            onDismissRequest = { showResultDialog = false },
+            icon = {
+                val (icon, tint) = when (current) {
+                    is UpdateCheckResult.UpdateAvailable -> Icons.Filled.CloudDownload to MaterialTheme.colorScheme.primary
+                    is UpdateCheckResult.UpToDate -> Icons.Filled.CloudDone to MaterialTheme.colorScheme.primary
+                    is UpdateCheckResult.Failure -> Icons.Filled.ErrorOutline to MaterialTheme.colorScheme.error
+                    null -> Icons.Filled.CloudDone to MaterialTheme.colorScheme.primary
                 }
-            }
-            is UpdateCheckResult.UpToDate -> Text(
-                text = "Ya tienes la última versión (${BuildConfig.VERSION_NAME}).",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            is UpdateCheckResult.Failure -> Text(
-                text = "No se ha podido comprobar: ${current.reason}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error,
-            )
-            null -> Unit
-        }
+                Icon(icon, contentDescription = null, tint = tint)
+            },
+            title = {
+                Text(
+                    when (current) {
+                        is UpdateCheckResult.UpdateAvailable -> "Hay una versión nueva"
+                        is UpdateCheckResult.UpToDate -> "¡Tu aplicación está al día!"
+                        is UpdateCheckResult.Failure -> "No se ha podido comprobar"
+                        null -> ""
+                    },
+                )
+            },
+            text = {
+                Text(
+                    when (current) {
+                        is UpdateCheckResult.UpdateAvailable -> "Versión ${current.versionName ?: current.versionCode} disponible."
+                        is UpdateCheckResult.UpToDate -> "Versión ${BuildConfig.VERSION_NAME}."
+                        is UpdateCheckResult.Failure -> current.reason
+                        null -> ""
+                    },
+                )
+            },
+            confirmButton = {
+                if (current is UpdateCheckResult.UpdateAvailable) {
+                    Button(onClick = {
+                        AppUpdater.installUpdate(context, current.apkFile)
+                        showResultDialog = false
+                    }) { Text("Instalar ahora") }
+                } else {
+                    Button(onClick = { showResultDialog = false }) { Text("Entendido") }
+                }
+            },
+            dismissButton = {
+                if (current is UpdateCheckResult.UpdateAvailable) {
+                    TextButton(onClick = { showResultDialog = false }) { Text("Ahora no") }
+                }
+            },
+        )
     }
 }
 
@@ -261,7 +384,6 @@ private fun DiagnosticsSection() {
     var copied by remember { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Diagnóstico", style = MaterialTheme.typography.titleMedium)
         Text(
             text = "Registro técnico local (emisora reproducida, errores de conexión y cierres inesperados). " +
                 "Si la app se cierra sola, cópialo y compártelo para poder ver qué ha pasado.",
@@ -325,24 +447,5 @@ private fun TextSizeSection(textScale: Float, onTextScaleChange: (Float) -> Unit
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun ThemeOption(
-    mode: ThemeMode,
-    labelRes: Int,
-    selected: ThemeMode,
-    onSelect: (ThemeMode) -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .selectable(selected = selected == mode, onClick = { onSelect(mode) })
-            .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RadioButton(selected = selected == mode, onClick = { onSelect(mode) })
-        Text(stringResource(labelRes), modifier = Modifier.padding(start = 8.dp))
     }
 }
