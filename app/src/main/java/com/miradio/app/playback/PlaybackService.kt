@@ -23,6 +23,7 @@ import com.miradio.app.R
 import com.miradio.app.data.database.AppDatabase
 import com.miradio.app.data.repository.PreferencesRepository
 import com.miradio.app.data.repository.StationRepository
+import com.miradio.app.domain.model.OutputDevice
 import com.miradio.app.domain.model.PlaybackStatus
 import com.miradio.app.util.DiagnosticsLog
 import com.miradio.app.widget.RadioWidgetProvider
@@ -241,11 +242,16 @@ class PlaybackService : MediaSessionService() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         DiagnosticsLog.log(this, "PlaybackService", "onTaskRemoved")
-        // Si no está sonando nada cuando se cierra la app desde "recientes",
-        // no tiene sentido mantener el servicio ni la notificación con vida.
-        if (!::radioPlayer.isInitialized ||
-            !radioPlayer.activePlayer.playWhenReady ||
-            radioPlayer.activePlayer.mediaItemCount == 0
+        // Si se está emitiendo por Cast, cerrar la app desde "recientes" NUNCA
+        // debe cortar la reproducción: todo el sentido de Cast es que el
+        // altavoz siga sonando aunque el teléfono se apague o cierres la app.
+        // Sin esta comprobación, el servicio podía autodestruirse (y con él
+        // la sesión de Cast) justo al cerrar la app tras activar el altavoz.
+        val isCasting = ::radioPlayer.isInitialized && radioPlayer.uiState.value.outputDevice == OutputDevice.CAST
+        if (!isCasting &&
+            (!::radioPlayer.isInitialized ||
+                !radioPlayer.activePlayer.playWhenReady ||
+                radioPlayer.activePlayer.mediaItemCount == 0)
         ) {
             stopSelf()
         }
