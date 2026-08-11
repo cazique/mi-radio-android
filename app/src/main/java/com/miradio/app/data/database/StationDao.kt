@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
@@ -45,6 +46,17 @@ interface StationDao {
      *  pueda pisar (por id duplicado) una emisora de fábrica o añadida a mano. */
     @Query("SELECT id FROM stations WHERE source != :source")
     suspend fun idsExcludingSource(source: String): List<String>
+
+    /**
+     * Sustituye todas las emisoras de [source] por [newEntities] en una única
+     * transacción: si el proceso muriera a mitad, o se queda con el catálogo
+     * anterior completo, o con el nuevo completo, nunca a medias.
+     */
+    @Transaction
+    suspend fun replaceSource(source: String, newEntities: List<StationEntity>) {
+        deleteBySource(source)
+        upsertAll(newEntities)
+    }
 
     @Query("SELECT COUNT(*) FROM stations")
     suspend fun count(): Int

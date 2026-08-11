@@ -79,6 +79,22 @@ fun HomeScreen(
             }
         },
     ) { padding ->
+        // Con el catálogo nacional (cientos de emisoras) hace falta agrupar;
+        // en búsqueda o en la pestaña de favoritos se deja la lista plana, que
+        // ya es corta por sí sola. remember() debe llamarse aquí, en el cuerpo
+        // @Composable de la pantalla, no dentro del builder de LazyColumn.
+        val isBrowsingAll = state.searchQuery.isBlank() && !showFavoritesOnly
+        val groups = remember(state.visibleStations, isBrowsingAll) {
+            if (!isBrowsingAll) {
+                emptyList()
+            } else {
+                state.visibleStations
+                    .groupBy { it.region?.takeIf { r -> r.isNotBlank() } ?: "Otras emisoras" }
+                    .toList()
+                    .sortedBy { (region, _) -> if (region == "Nacional") "" else region }
+            }
+        }
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -136,17 +152,7 @@ fun HomeScreen(
                 }
             }
 
-            // Con el catálogo nacional (cientos de emisoras) hace falta agrupar;
-            // en búsqueda o en la pestaña de favoritos se deja la lista plana,
-            // que ya es corta por sí sola.
-            val isBrowsingAll = state.searchQuery.isBlank() && !showFavoritesOnly
             if (isBrowsingAll) {
-                val groups = remember(state.visibleStations) {
-                    state.visibleStations
-                        .groupBy { it.region?.takeIf { r -> r.isNotBlank() } ?: "Otras emisoras" }
-                        .toList()
-                        .sortedBy { (region, _) -> if (region == "Nacional") "" else region }
-                }
                 groups.forEach { (region, stationsInRegion) ->
                     stickyHeader(key = region) {
                         RegionHeader(region = region, count = stationsInRegion.size)

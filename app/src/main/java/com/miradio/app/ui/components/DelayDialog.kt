@@ -1,11 +1,13 @@
 package com.miradio.app.ui.components
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
@@ -39,7 +41,16 @@ fun DelayDialog(currentSeconds: Int, onDismiss: () -> Unit, onConfirm: (seconds:
         onDismissRequest = onDismiss,
         title = { Text("Retardo del directo") },
         text = {
-            LazyColumn {
+            Column {
+                Text(
+                    text = "Aproximado: se consigue aumentando el búfer de reproducción, así " +
+                        "que el desfase real puede variar un poco según la emisora y la red, " +
+                        "no es una sincronización exacta al fotograma.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+                LazyColumn {
                 items(presetsSeconds) { seconds ->
                     Row(
                         modifier = Modifier
@@ -75,6 +86,7 @@ fun DelayDialog(currentSeconds: Int, onDismiss: () -> Unit, onConfirm: (seconds:
                             suffix = { Text("s") },
                         )
                     }
+                }
                 }
             }
         },

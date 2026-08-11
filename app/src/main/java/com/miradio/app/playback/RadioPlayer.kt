@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 private const val TAG = "RadioPlayer"
+private val RETRY_DELAYS_MS = listOf(2_000L, 5_000L, 10_000L)
 
 /**
  * Envuelve un [ExoPlayer] local y un [CastPlayer] y expone siempre un único
@@ -51,6 +52,8 @@ class RadioPlayer(
     private var currentStation: RadioStation? = null
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var sleepTimerJob: Job? = null
+    private var retryJob: Job? = null
+    private var retryAttempt = 0
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState
@@ -72,6 +75,29 @@ class RadioPlayer(
             DiagnosticsLog.logThrowable(context, "RadioPlayer", "onPlayerError (${error.errorCodeName})", error)
             val playbackError = mapExoError(error)
             _uiState.update { it.copy(status = PlaybackStatus.ERROR, errorMessage = playbackError.messageKey) }
+            scheduleRetry()
+        }
+    }
+
+    /**
+     * Reintenta la emisora actual con backoff (2 s, 5 s, 10 s) antes de
+     * rendirse y dejar el error visible. Sin esto, un simple corte de red
+     * (Wi-Fi ↔ datos, un segundo de mala cobertura) obliga al usuario a
+     * pulsar play a mano cada vez.
+     */
+    private fun scheduleRetry() {
+        val station = currentStation ?: return
+        if (retryAttempt >= RETRY_DELAYS_MS.size) return
+        val delayMs = RETRY_DELAYS_MS[retryAttempt]
+        retryAttempt += 1
+        retryJob?.cancel()
+        retryJob = scope.launch {
+            delay(delayMs)
+            if (currentStation?.id != station.id) return@launch // el usuario cambió de emisora mientras tanto
+            DiagnosticsLog.log(context, "RadioPlayer", "Reintentando ${station.id} (intento $retryAttempt)")
+            activePlayer.setMediaItem(buildMediaItem(station))
+            activePlayer.prepare()
+            activePlayer.playWhenReady = true
         }
     }
 
@@ -172,6 +198,8 @@ class RadioPlayer(
 
     fun playStation(station: RadioStation) {
         DiagnosticsLog.log(context, "RadioPlayer", "playStation(${station.id}, ${station.streamUrl})")
+        retryJob?.cancel()
+        retryAttempt = 0
         currentStation = station
         _uiState.update { it.copy(station = station, status = PlaybackStatus.BUFFERING, errorMessage = null) }
         activePlayer.setMediaItem(buildMediaItem(station))
@@ -192,6 +220,8 @@ class RadioPlayer(
     }
 
     fun stop() {
+        retryJob?.cancel()
+        retryAttempt = 0
         activePlayer.stop()
         _uiState.update { it.copy(status = PlaybackStatus.STOPPED) }
         cancelSleepTimer()
@@ -231,6 +261,11 @@ class RadioPlayer(
             activePlayer.playbackState == Player.STATE_READY && !activePlayer.playWhenReady -> PlaybackStatus.PAUSED
             else -> _uiState.value.status
         }
+        if (status == PlaybackStatus.PLAYING && retryAttempt > 0) {
+            // Se recuperó solo tras un error: se reinicia el contador de reintentos.
+            retryJob?.cancel()
+            retryAttempt = 0
+        }
         _uiState.update { it.copy(status = status, errorMessage = null) }
     }
 
@@ -250,6 +285,7 @@ class RadioPlayer(
     fun release() {
         DiagnosticsLog.log(context, "RadioPlayer", "release()")
         sleepTimerJob?.cancel()
+        retryJob?.cancel()
         localPlayer.removeListener(playerListener)
         castPlayer?.removeListener(playerListener)
         castPlayer?.setSessionAvailabilityListener(null)

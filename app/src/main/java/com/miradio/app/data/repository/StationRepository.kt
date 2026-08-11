@@ -81,22 +81,34 @@ class StationRepository(
         when (val result = remoteService.fetchCatalog(url)) {
             is RemoteCatalogResult.Failure -> CatalogSyncResult.Failure(result.reason)
             is RemoteCatalogResult.Success -> {
+                // Un catálogo vacío casi nunca es intencionado (JSON roto, CDN caída,
+                // fichero sustituido por error...) y borraría todo el catálogo remoto
+                // que ya tenías. Se trata como fallo en vez de aplicarlo.
+                if (result.stations.isEmpty()) {
+                    return@withContext CatalogSyncResult.Failure(
+                        "El catálogo remoto está vacío; no se ha aplicado ningún cambio.",
+                    )
+                }
                 // Recordamos qué emisoras remotas estaban marcadas como favoritas
                 // antes de reemplazar el catálogo, para no perder esa marca al
                 // volver a sincronizar.
                 val previousFavoriteIds = dao.favoriteIdsBySource(StationSource.REMOTE.name).toSet()
                 val protectedIds = dao.idsExcludingSource(StationSource.REMOTE.name).toSet()
-                dao.deleteBySource(StationSource.REMOTE.name)
                 val entities = result.stations
                     .filter { it.id !in protectedIds }
                     .mapIndexed { index, dto ->
                         val station = dto.toDomain(StationSource.REMOTE, index)
                         // El JSON puede declarar una emisora "favorita por defecto"
-                        // (p. ej. Madrid/León); eso se respeta siempre. Si no lo
-                        // declara, se conserva lo que el usuario haya marcado a mano.
+                        // (p. ej. Madrid/León); eso se respeta siempre, incluso si el
+                        // usuario la había desmarcado, para que "siempre favorita"
+                        // funcione de verdad. Si no lo declara, se conserva lo que el
+                        // usuario haya marcado a mano.
                         station.copy(isFavorite = dto.isFavorite || station.id in previousFavoriteIds).toEntity()
                     }
-                dao.upsertAll(entities)
+                // Borrar+insertar en una sola transacción: si el proceso muere a
+                // mitad, la app se queda con el catálogo anterior completo, nunca
+                // a medias.
+                dao.replaceSource(StationSource.REMOTE.name, entities)
                 CatalogSyncResult.Success(entities.size)
             }
         }
