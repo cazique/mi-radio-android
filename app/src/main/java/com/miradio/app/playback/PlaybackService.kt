@@ -5,7 +5,6 @@ import android.util.Log
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.google.android.gms.cast.framework.CastContext
-import com.google.android.gms.cast.framework.CastException
 import com.miradio.app.data.database.AppDatabase
 import com.miradio.app.data.repository.StationRepository
 import com.miradio.app.domain.model.PlaybackStatus
@@ -41,9 +40,6 @@ class PlaybackService : MediaSessionService() {
 
         val castContext = try {
             CastContext.getSharedInstance(this)
-        } catch (e: CastException) {
-            Log.w(TAG, "Google Cast no disponible en este dispositivo: ${e.message}")
-            null
         } catch (e: Exception) {
             // Dispositivos sin Google Play Services (algunos emuladores, Android TV
             // sin GMS, etc.) no deben impedir que la radio suene localmente.
