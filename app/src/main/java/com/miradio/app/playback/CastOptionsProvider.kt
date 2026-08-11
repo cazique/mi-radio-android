@@ -4,8 +4,6 @@ import android.content.Context
 import com.google.android.gms.cast.framework.CastOptions
 import com.google.android.gms.cast.framework.OptionsProvider
 import com.google.android.gms.cast.framework.SessionProvider
-import com.google.android.gms.cast.framework.media.CastMediaOptions
-import com.google.android.gms.cast.framework.media.NotificationOptions
 
 /**
  * Configuración de Google Cast. Usamos el receptor multimedia por defecto de
@@ -16,23 +14,16 @@ import com.google.android.gms.cast.framework.media.NotificationOptions
 class CastOptionsProvider : OptionsProvider {
 
     override fun getCastOptions(context: Context): CastOptions {
-        val notificationOptions = NotificationOptions.Builder()
-            .setActions(
-                listOf(
-                    com.google.android.gms.cast.framework.media.MediaIntentReceiver.ACTION_TOGGLE_PLAYBACK,
-                    com.google.android.gms.cast.framework.media.MediaIntentReceiver.ACTION_STOP_CASTING,
-                ),
-                intArrayOf(0, 1),
-            )
-            .build()
-
-        val mediaOptions = CastMediaOptions.Builder()
-            .setNotificationOptions(notificationOptions)
-            .build()
-
+        // OJO: no configurar CastMediaOptions.NotificationOptions aquí. Eso
+        // hace que el propio SDK de Cast publique SU notificación propia
+        // (independiente de PlaybackService), y como nuestro servicio de
+        // Media3 ya mantiene su propia notificación mientras se hace Cast,
+        // el resultado eran dos notificaciones duplicadas para lo mismo.
+        // Con Media3 basta: DefaultMediaNotificationProvider sigue
+        // mostrando (y controlando) la notificación aunque el reproductor
+        // activo pase a ser el CastPlayer.
         return CastOptions.Builder()
             .setReceiverApplicationId(com.google.android.gms.cast.CastMediaControlIntent.DEFAULT_MEDIA_RECEIVER_APPLICATION_ID)
-            .setCastMediaOptions(mediaOptions)
             .setResumeSavedSession(true)
             .build()
     }
