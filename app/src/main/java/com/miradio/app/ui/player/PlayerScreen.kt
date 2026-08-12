@@ -21,12 +21,17 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.VolumeDown
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
@@ -38,6 +43,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -98,11 +104,12 @@ fun PlayerScreen(
         ) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(0.75f)
+                    .fillMaxWidth(0.78f)
                     .aspectRatio(1f)
-                    .padding(top = 12.dp),
+                    .padding(top = 16.dp)
+                    .shadow(elevation = 24.dp, shape = RoundedCornerShape(24.dp), clip = false),
             ) {
-                StationLogo(logoUrl = station?.logoUrl, modifier = Modifier.fillMaxSize(), cornerRadius = 20)
+                StationLogo(logoUrl = station?.logoUrl, modifier = Modifier.fillMaxSize(), cornerRadius = 24)
                 if (isPlaying) {
                     Surface(
                         color = MaterialTheme.colorScheme.secondary,
@@ -177,6 +184,34 @@ fun PlayerScreen(
                 IconButton(onClick = { viewModel.onSkipStation(1) }, enabled = station != null) {
                     Icon(Icons.Filled.SkipNext, contentDescription = stringResource(R.string.cd_next_station), tint = Color.White, modifier = Modifier.size(36.dp))
                 }
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Icon(
+                    imageVector = when {
+                        state.player.volume <= 0f -> Icons.Filled.VolumeOff
+                        state.player.volume < 0.5f -> Icons.Filled.VolumeDown
+                        else -> Icons.Filled.VolumeUp
+                    },
+                    contentDescription = stringResource(R.string.cd_volume),
+                    tint = Color(0xFFB0B0BC),
+                )
+                Slider(
+                    value = state.player.volume,
+                    onValueChange = viewModel::onVolumeChange,
+                    modifier = Modifier.weight(1f),
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.secondary,
+                        activeTrackColor = MaterialTheme.colorScheme.secondary,
+                        inactiveTrackColor = Color(0xFF2A2A34),
+                    ),
+                )
             }
 
             Row(

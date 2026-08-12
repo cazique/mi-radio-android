@@ -85,8 +85,10 @@ fun HomeScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onAddStation) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.home_add_station))
+            if (!state.hideAddButton) {
+                FloatingActionButton(onClick = onAddStation) {
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.home_add_station))
+                }
             }
         },
     ) { padding ->

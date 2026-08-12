@@ -35,6 +35,7 @@ class PreferencesRepository(private val context: Context) {
         val RECENT_STATION_IDS = stringPreferencesKey("recent_station_ids")
         val DEBUG_MODE = booleanPreferencesKey("debug_mode")
         val SIMPLE_MODE = booleanPreferencesKey("simple_mode")
+        val HIDE_ADD_BUTTON = booleanPreferencesKey("hide_add_button")
     }
 
     val lastStationId: Flow<String?> =
@@ -82,6 +83,11 @@ class PreferencesRepository(private val context: Context) {
      *  defecto: lo activa quien configura la app, no el usuario final. */
     val simpleMode: Flow<Boolean> = context.dataStore.data.map { it[Keys.SIMPLE_MODE] ?: false }
 
+    /** Oculta solo el botón "+ Añadir emisora" de Inicio/Explorar, sin
+     *  activar el resto del modo simple. Para quien quiere la app normal
+     *  pero sin la tentación de que alguien toque "añadir" sin querer. */
+    val hideAddButton: Flow<Boolean> = context.dataStore.data.map { it[Keys.HIDE_ADD_BUTTON] ?: false }
+
     suspend fun setLastStation(id: String) {
         context.dataStore.edit { it[Keys.LAST_STATION_ID] = id }
     }
@@ -126,6 +132,10 @@ class PreferencesRepository(private val context: Context) {
 
     suspend fun setSimpleMode(enabled: Boolean) {
         context.dataStore.edit { it[Keys.SIMPLE_MODE] = enabled }
+    }
+
+    suspend fun setHideAddButton(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.HIDE_ADD_BUTTON] = enabled }
     }
 
     /** Añade [id] al principio del historial de "últimas escuchadas",

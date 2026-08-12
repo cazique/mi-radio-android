@@ -118,4 +118,5 @@
     <string name="cd_search">Buscar</string>
     <string name="cd_next_station">Siguiente emisora</string>
     <string name="cd_previous_station">Emisora anterior</string>
+    <string name="cd_volume">Volumen</string>
 </resources>

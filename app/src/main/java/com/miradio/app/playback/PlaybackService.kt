@@ -32,7 +32,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 private const val TAG = "PlaybackService"
@@ -220,9 +222,17 @@ class PlaybackService : MediaSessionService() {
         PlaybackServiceConnector.attach(radioPlayer)
 
         serviceScope.launch {
-            radioPlayer.uiState.collect { state ->
-                RadioWidgetProvider.updateAll(this@PlaybackService, state.station?.name, state.status)
-            }
+            // distinctUntilChanged: uiState cambia por muchos motivos que no
+            // afectan al widget (canción "ahora suena" vía ICY, temporizador
+            // de apagado contando segundo a segundo, retardo del directo...).
+            // Sin esto, se repintaba el widget en cada uno de esos cambios,
+            // muchas veces por minuto sin necesidad.
+            radioPlayer.uiState
+                .map { it.station?.name to it.status }
+                .distinctUntilChanged()
+                .collect { (stationName, status) ->
+                    RadioWidgetProvider.updateAll(this@PlaybackService, stationName, status)
+                }
         }
 
         serviceScope.launch {

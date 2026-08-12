@@ -1,5 +1,6 @@
 package com.miradio.app.ui.settings
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -113,6 +114,7 @@ fun SettingsScreen(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 SectionHeader(Icons.Filled.Accessibility, SectionGreen, "Modo simple")
                 SimpleModeSection(enabled = state.simpleMode, onEnabledChange = viewModel::onSimpleModeChange)
+                HideAddButtonSection(enabled = state.hideAddButton, onEnabledChange = viewModel::onHideAddButtonChange)
             }
 
             HorizontalDivider()
@@ -369,12 +371,41 @@ private fun SimpleModeSection(enabled: Boolean, onEnabledChange: (Boolean) -> Un
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(modifier = Modifier.padding(end = 16.dp)) {
+        // OJO: weight(1f) es imprescindible aquí. Sin él, un Text que
+        // necesita varias líneas mide su ancho como el máximo disponible en
+        // el Row entero (no se "encoge" a lo que realmente ocupa), dejando
+        // al Switch sin sitio y empujándolo fuera de la pantalla por la
+        // derecha. Con weight(1f) el texto se queda con el ancho restante
+        // tras reservarle sitio de verdad al Switch.
+        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
             Text(
                 text = "Muestra solo las emisoras favoritas en tarjetas grandes y un botón de " +
                     "Reproducir/Pausa enorme. Se ocultan Explorar, Añadir emisora y el catálogo " +
                     "remoto. Ideal para dejar la app lista para alguien que solo quiere poner " +
                     "su emisora sin liarse con el resto.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = enabled, onCheckedChange = onEnabledChange)
+    }
+}
+
+/**
+ * Oculta solo el botón "+ Añadir emisora" (en Inicio y en Explorar), sin
+ * activar el resto del modo simple: para quien quiere la app normal pero
+ * sin que nadie pueda tocar "añadir" por accidente.
+ */
+@Composable
+private fun HideAddButtonSection(enabled: Boolean, onEnabledChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+            Text(
+                text = "Ocultar el botón de añadir emisora",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -396,7 +427,7 @@ private fun DebugModeSection(enabled: Boolean, onEnabledChange: (Boolean) -> Uni
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(modifier = Modifier.padding(end = 16.dp)) {
+        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
             Text("Modo depuración", style = MaterialTheme.typography.titleMedium)
             Text(
                 text = "Muestra el registro técnico interno más abajo. Actívalo solo si vas a " +
@@ -414,6 +445,7 @@ private fun DebugModeSection(enabled: Boolean, onEnabledChange: (Boolean) -> Uni
  * copie a mano): sirve para ver qué ha pasado justo antes de un cierre
  * inesperado sin necesidad de conectar el móvil a un ordenador.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DiagnosticsSection() {
     val context = LocalContext.current
@@ -429,7 +461,10 @@ private fun DiagnosticsSection() {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // FlowRow en vez de Row: con 3 botones no siempre caben todos en una
+        // sola línea en pantallas estrechas; así el que sobra pasa a la
+        // siguiente línea en vez de salirse por el borde de la pantalla.
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = {
                 scope.launch {
                     logText = withContext(Dispatchers.IO) { DiagnosticsLog.readAll(context) }
@@ -446,6 +481,14 @@ private fun DiagnosticsSection() {
                     }
                 },
             ) { Text(if (copied) "¡Copiado!" else "Copiar registro") }
+
+            OutlinedButton(
+                onClick = {
+                    context.startActivity(
+                        Intent.createChooser(DiagnosticsLog.shareIntent(context), "Compartir registro"),
+                    )
+                },
+            ) { Text("Compartir registro") }
         }
         if (logText.isNotBlank()) {
             Text(

@@ -39,6 +39,10 @@ class PlayerViewModel(
         PlayerScreenState(player = playerState, stations = stations)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PlayerScreenState())
 
+    fun onVolumeChange(volume: Float) {
+        PlaybackServiceConnector.player.value?.setVolume(volume)
+    }
+
     fun onPlayPauseClick() {
         val player = PlaybackServiceConnector.player.value ?: return
         val isActive = player.uiState.value.status == PlaybackStatus.PLAYING ||

@@ -31,4 +31,8 @@ data class PlayerUiState(
      *  llegado ninguno (muchas emisoras no los mandan) o justo tras cambiar
      *  de emisora, hasta que llegue el primero de la nueva. */
     val nowPlayingTitle: String? = null,
+    /** Volumen del reproductor activo (0f-1f). Funciona igual en el móvil
+     *  que en Cast: la propia interfaz Player de Media3 lo traduce al
+     *  volumen del altavoz cuando se está reproduciendo por Cast. */
+    val volume: Float = 1f,
 )

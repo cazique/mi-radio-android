@@ -104,10 +104,10 @@ fun HomeLandingScreen(
             )
         },
         floatingActionButton = {
-            // Añadir/editar emisoras es una acción avanzada: en modo simple
-            // se oculta para que no haya nada que se pueda tocar sin querer
-            // y desconfigure la app de quien solo quiere escuchar la radio.
-            if (!state.simpleMode) {
+            // Añadir/editar emisoras es una acción avanzada: se oculta en
+            // modo simple, o si se ha ocultado el botón por su cuenta desde
+            // Ajustes (sin necesidad de activar el modo simple completo).
+            if (!state.simpleMode && !state.hideAddButton) {
                 FloatingActionButton(onClick = onAddStation) {
                     Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.home_add_station))
                 }

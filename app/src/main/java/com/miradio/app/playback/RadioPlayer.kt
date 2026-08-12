@@ -98,6 +98,13 @@ class RadioPlayer(
             updateStatusFromPlayer()
         }
 
+        /** El volumen puede cambiar sin pasar por setVolume() de esta clase
+         *  (p. ej. los botones físicos de un altavoz Cast), así que se
+         *  escucha en vez de fiarse solo de lo que se manda aquí. */
+        override fun onVolumeChanged(volume: Float) {
+            _uiState.update { it.copy(volume = volume) }
+        }
+
         override fun onPlayerError(error: PlaybackException) {
             Log.w(TAG, "Playback error: ${error.errorCodeName}", error)
             DiagnosticsLog.logThrowable(context, "RadioPlayer", "onPlayerError (${error.errorCodeName})", error)
@@ -214,8 +221,13 @@ class RadioPlayer(
     private fun buildLocalPlayer(delaySeconds: Int): ExoPlayer {
         val delayMs = delaySeconds.coerceIn(0, 300) * 1_000
         val bufferForPlaybackMs = (2_500).coerceAtLeast(delayMs)
-        val minBufferMs = (50_000).coerceAtLeast(bufferForPlaybackMs + 10_000)
-        val maxBufferMs = minBufferMs + 20_000
+        // Antes el mínimo era 50 s fijos, muchísimo más de lo que necesita un
+        // directo (no hay "hacia adelante" al que adelantar, así que un
+        // búfer enorme no aporta nada salvo mantener el móvil trabajando más
+        // de la cuenta para mantenerlo siempre lleno). 15 s de colchón es de
+        // sobra para aguantar cortes breves de red sin cortarse.
+        val minBufferMs = (15_000).coerceAtLeast(bufferForPlaybackMs + 10_000)
+        val maxBufferMs = minBufferMs + 15_000
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(minBufferMs, maxBufferMs, bufferForPlaybackMs, bufferForPlaybackMs)
             .build()
@@ -319,6 +331,15 @@ class RadioPlayer(
 
     fun pause() {
         activePlayer.playWhenReady = false
+    }
+
+    /** Funciona igual reproduciendo en el móvil que en un altavoz Cast: la
+     *  interfaz [Player] de Media3 expone el volumen de la misma forma en
+     *  ambos casos (CastPlayer lo traduce al volumen del propio altavoz). */
+    fun setVolume(volume: Float) {
+        val clamped = volume.coerceIn(0f, 1f)
+        activePlayer.volume = clamped
+        _uiState.update { it.copy(volume = clamped) }
     }
 
     fun stop() {

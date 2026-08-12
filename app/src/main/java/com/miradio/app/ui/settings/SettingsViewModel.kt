@@ -26,6 +26,7 @@ data class SettingsUiState(
     val textScale: Float = 1f,
     val debugMode: Boolean = true,
     val simpleMode: Boolean = false,
+    val hideAddButton: Boolean = false,
 )
 
 class SettingsViewModel(
@@ -57,6 +58,8 @@ class SettingsViewModel(
         state.copy(debugMode = debug)
     }.combine(container.preferencesRepository.simpleMode) { state, simple ->
         state.copy(simpleMode = simple)
+    }.combine(container.preferencesRepository.hideAddButton) { state, hideAdd ->
+        state.copy(hideAddButton = hideAdd)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
     fun onThemeModeChange(mode: ThemeMode) {
@@ -73,6 +76,10 @@ class SettingsViewModel(
 
     fun onSimpleModeChange(enabled: Boolean) {
         viewModelScope.launch { container.preferencesRepository.setSimpleMode(enabled) }
+    }
+
+    fun onHideAddButtonChange(enabled: Boolean) {
+        viewModelScope.launch { container.preferencesRepository.setHideAddButton(enabled) }
     }
 
     fun onRemoteUrlChange(url: String) {

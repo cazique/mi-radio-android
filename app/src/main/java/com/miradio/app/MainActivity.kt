@@ -10,12 +10,21 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -31,8 +40,10 @@ import com.miradio.app.ui.navigation.Routes
 import com.miradio.app.ui.navigation.bottomBarRoutes
 import com.miradio.app.ui.theme.MiRadioTheme
 import com.miradio.app.util.DiagnosticsLog
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 // El botón de Cast (MediaRouteButton) exige que la Activity que lo aloja
 // sea una FragmentActivity para poder mostrar su diálogo de selección de
@@ -70,6 +81,7 @@ class MainActivity : FragmentActivity() {
                     LocalDensity provides Density(density.density, fontScale = textScale),
                 ) {
                     MiRadioApp(simpleMode = simpleMode)
+                    CrashReportPrompt()
                 }
             }
         }
@@ -110,6 +122,42 @@ class MainActivity : FragmentActivity() {
                 container.preferencesRepository.setLastStation(it.id)
             }
         }
+    }
+}
+
+/**
+ * No hay servidor detrás de esta app, así que no existe un "enviar el
+ * registro solo" de verdad sin construir una infraestructura que no hay.
+ * Esto es lo más parecido y honesto: si la app se cerró de golpe hace
+ * poco, se ofrece compartir el registro nada más volver a abrirla, en vez
+ * de esperar a que alguien se acuerde de ir a Ajustes por su cuenta.
+ */
+@Composable
+private fun CrashReportPrompt() {
+    val context = LocalContext.current
+    var showPrompt by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        showPrompt = withContext(Dispatchers.IO) { DiagnosticsLog.hadRecentCrash(context) }
+    }
+
+    if (showPrompt) {
+        AlertDialog(
+            onDismissRequest = { showPrompt = false },
+            title = { Text("La app se cerró sola") },
+            text = { Text("Parece que Radio Dari se cerró de forma inesperada hace un momento. ¿Quieres compartir el registro técnico para poder ver qué ha pasado?") },
+            confirmButton = {
+                Button(onClick = {
+                    showPrompt = false
+                    context.startActivity(
+                        Intent.createChooser(DiagnosticsLog.shareIntent(context), "Compartir registro"),
+                    )
+                }) { Text("Compartir") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPrompt = false }) { Text("No, gracias") }
+            },
+        )
     }
 }
 

@@ -37,6 +37,8 @@ data class HomeUiState(
     /** Con el modo simple activo, Inicio se reduce a "ahora suena" +
      *  favoritas en tarjetas grandes, sin acceso a Explorar/Añadir emisora. */
     val simpleMode: Boolean = false,
+    /** Oculta solo el botón "+ Añadir emisora", independiente del modo simple. */
+    val hideAddButton: Boolean = false,
 ) {
     val displayedStation: RadioStation? get() = player.station ?: lastStation
 }
@@ -79,6 +81,8 @@ class HomeViewModel(
         )
     }.combine(container.preferencesRepository.simpleMode) { state, simple ->
         state.copy(simpleMode = simple)
+    }.combine(container.preferencesRepository.hideAddButton) { state, hideAdd ->
+        state.copy(hideAddButton = hideAdd)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 
     init {

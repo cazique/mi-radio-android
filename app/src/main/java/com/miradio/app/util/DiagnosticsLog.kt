@@ -1,7 +1,9 @@
 package com.miradio.app.util
 
 import android.content.Context
+import android.content.Intent
 import android.util.Log
+import androidx.core.content.FileProvider
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
@@ -58,6 +60,42 @@ object DiagnosticsLog {
 
     fun clear(context: Context) {
         runCatching { logFile(context).delete() }
+    }
+
+    /**
+     * No hay servidor detrás de esta app (es un APK suelto, sin backend), así
+     * que un "envío automático" silencioso no es posible sin inventar una
+     * infraestructura que no existe. Lo más cercano y honesto: un botón que
+     * abre el selector de compartir de Android (correo, WhatsApp, lo que
+     * sea) con el registro ya adjunto, en un solo toque en vez de copiar y
+     * pegar a mano.
+     */
+    fun shareIntent(context: Context): Intent {
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", logFile(context))
+        return Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, "Registro de Radio Dari")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+    }
+
+    /**
+     * Si la app se cerró de forma inesperada hace poco (registrado por
+     * [installUncaughtExceptionLogger] justo antes de que el sistema matara
+     * el proceso), lo detecta para poder ofrecer compartir el registro en
+     * cuanto se vuelve a abrir la app, en vez de que el usuario tenga que
+     * acordarse de ir a Ajustes por su cuenta.
+     */
+    @Synchronized
+    fun hadRecentCrash(context: Context, withinMillis: Long = 5 * 60_000L): Boolean {
+        val lastFatalAt = runCatching {
+            logFile(context).takeIf { it.exists() }
+                ?.readLines()
+                ?.lastOrNull { it.contains("[FATAL]") }
+                ?.let { line -> dateFormat.parse(line.take(19))?.time }
+        }.getOrNull() ?: return false
+        return System.currentTimeMillis() - lastFatalAt in 0..withinMillis
     }
 
     private fun trimIfNeeded(context: Context) {
