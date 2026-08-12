@@ -98,7 +98,11 @@ fun StationEditScreen(
                             state.urlError -> stringResource(R.string.stations_validation_url)
                             state.urlCheckState == UrlCheckState.CHECKING -> stringResource(R.string.stations_checking_url)
                             state.urlCheckState == UrlCheckState.OK -> stringResource(R.string.stations_url_ok)
-                            state.urlCheckState == UrlCheckState.FAILED -> stringResource(R.string.stations_url_failed)
+                            // El motivo concreto (p. ej. "el servidor responde
+                            // pero no parece audio") es más útil que el
+                            // mensaje genérico cuando está disponible.
+                            state.urlCheckState == UrlCheckState.FAILED ->
+                                state.urlCheckMessage ?: stringResource(R.string.stations_url_failed)
                             else -> ""
                         },
                     )

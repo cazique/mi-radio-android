@@ -1,8 +1,11 @@
 package com.miradio.app.playback
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
 import android.net.Uri
 import android.util.Log
+import androidx.core.content.getSystemService
 import androidx.media3.cast.CastPlayer
 import androidx.media3.cast.SessionAvailabilityListener
 import androidx.media3.common.MediaItem
@@ -58,6 +61,26 @@ class RadioPlayer(
     private var retryJob: Job? = null
     private var retryAttempt = 0
 
+    private val connectivityManager = context.getSystemService<ConnectivityManager>()
+
+    /**
+     * Tras agotar los reintentos con backoff, en vez de rendirse hasta que el
+     * usuario toque play a mano, se espera a que vuelva la conectividad. Sin
+     * esto, un corte de red algo más largo que ~17 s (2+5+10) dejaba la radio
+     * muerta para siempre aunque el Wi-Fi volviera solo segundos después.
+     * onAvailable() se dispara con cualquier cambio de red, no solo cuando
+     * "vuelve" tras haberse caído, así que solo actúa si de verdad hay una
+     * emisora esperando en estado de error.
+     */
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
+            if (_uiState.value.status != PlaybackStatus.ERROR) return
+            val station = currentStation ?: return
+            DiagnosticsLog.log(context, "RadioPlayer", "Conectividad recuperada, reintentando ${station.id}")
+            retryNow(station)
+        }
+    }
+
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState
 
@@ -83,10 +106,10 @@ class RadioPlayer(
     }
 
     /**
-     * Reintenta la emisora actual con backoff (2 s, 5 s, 10 s) antes de
-     * rendirse y dejar el error visible. Sin esto, un simple corte de red
-     * (Wi-Fi ↔ datos, un segundo de mala cobertura) obliga al usuario a
-     * pulsar play a mano cada vez.
+     * Reintenta la emisora actual con backoff (2 s, 5 s, 10 s). Si se agotan
+     * los tres intentos, no se rinde para siempre: se queda en estado de
+     * error hasta que vuelva la conectividad (ver [networkCallback]) o el
+     * usuario pulse play a mano.
      */
     private fun scheduleRetry() {
         val station = currentStation ?: return
@@ -98,10 +121,14 @@ class RadioPlayer(
             delay(delayMs)
             if (currentStation?.id != station.id) return@launch // el usuario cambió de emisora mientras tanto
             DiagnosticsLog.log(context, "RadioPlayer", "Reintentando ${station.id} (intento $retryAttempt)")
-            activePlayer.setMediaItem(buildMediaItem(station))
-            activePlayer.prepare()
-            activePlayer.playWhenReady = true
+            retryNow(station)
         }
+    }
+
+    private fun retryNow(station: RadioStation) {
+        activePlayer.setMediaItem(buildMediaItem(station))
+        activePlayer.prepare()
+        activePlayer.playWhenReady = true
     }
 
     init {
@@ -116,6 +143,8 @@ class RadioPlayer(
                 switchTo(localPlayer, OutputDevice.PHONE, null)
             }
         })
+        runCatching { connectivityManager?.registerDefaultNetworkCallback(networkCallback) }
+            .onFailure { Log.w(TAG, "No se pudo registrar el callback de conectividad: ${it.message}") }
     }
 
     private fun switchTo(newPlayer: Player, device: OutputDevice, castDeviceName: String?) {
@@ -333,6 +362,7 @@ class RadioPlayer(
         DiagnosticsLog.log(context, "RadioPlayer", "release()")
         sleepTimerJob?.cancel()
         retryJob?.cancel()
+        runCatching { connectivityManager?.unregisterNetworkCallback(networkCallback) }
         localPlayer.removeListener(playerListener)
         castPlayer?.removeListener(playerListener)
         castPlayer?.setSessionAvailabilityListener(null)
