@@ -29,6 +29,7 @@
     <string name="home_explore_all">Explorar emisoras</string>
     <string name="home_explore_count">%1$d emisoras</string>
     <string name="home_favorites_count">%1$d favoritas</string>
+    <string name="home_simple_empty">Todavía no tienes emisoras favoritas. Desactiva el modo simple en Ajustes para explorar el catálogo y elegir tus favoritas.</string>
 
     <!-- Reproductor -->
     <string name="player_play">Reproducir</string>

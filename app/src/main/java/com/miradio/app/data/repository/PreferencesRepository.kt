@@ -35,6 +35,7 @@ class PreferencesRepository(private val context: Context) {
         val TEXT_SCALE = floatPreferencesKey("text_scale")
         val RECENT_STATION_IDS = stringPreferencesKey("recent_station_ids")
         val DEBUG_MODE = booleanPreferencesKey("debug_mode")
+        val SIMPLE_MODE = booleanPreferencesKey("simple_mode")
     }
 
     val lastStationId: Flow<String?> =
@@ -77,6 +78,12 @@ class PreferencesRepository(private val context: Context) {
      *  en Ajustes. Activado por defecto mientras la app está en pruebas; se
      *  puede desactivar para un uso normal, sin texto técnico a la vista. */
     val debugMode: Flow<Boolean> = context.dataStore.data.map { it[Keys.DEBUG_MODE] ?: true }
+
+    /** Modo simple: reduce Inicio a "ahora suena" + favoritas en tarjetas
+     *  grandes, y la barra inferior a Inicio/Ajustes, pensado para personas
+     *  mayores o con dificultad para manejar el móvil. Desactivado por
+     *  defecto: lo activa quien configura la app, no el usuario final. */
+    val simpleMode: Flow<Boolean> = context.dataStore.data.map { it[Keys.SIMPLE_MODE] ?: false }
 
     suspend fun setLastStation(id: String) {
         context.dataStore.edit { it[Keys.LAST_STATION_ID] = id }
@@ -122,6 +129,10 @@ class PreferencesRepository(private val context: Context) {
 
     suspend fun setDebugMode(enabled: Boolean) {
         context.dataStore.edit { it[Keys.DEBUG_MODE] = enabled }
+    }
+
+    suspend fun setSimpleMode(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.SIMPLE_MODE] = enabled }
     }
 
     /** Añade [id] al principio del historial de "últimas escuchadas",

@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Accessibility
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.BrightnessAuto
@@ -81,6 +82,7 @@ import java.util.Date
 
 private val SectionPurple = Color(0xFF7C5CFC)
 private val SectionBlue = Color(0xFF3B82F6)
+private val SectionGreen = Color(0xFF2E9B5C)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -108,44 +110,53 @@ fun SettingsScreen(
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SectionHeader(Icons.Filled.Accessibility, SectionGreen, "Modo simple")
+                SimpleModeSection(enabled = state.simpleMode, onEnabledChange = viewModel::onSimpleModeChange)
+            }
+
+            Divider()
+
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 SectionHeader(Icons.Filled.Palette, SectionPurple, "Apariencia")
                 ThemeCardPicker(selected = state.themeMode, onSelect = viewModel::onThemeModeChange)
                 TextSizeSection(textScale = state.textScale, onTextScaleChange = viewModel::onTextScaleChange)
             }
 
-            Divider()
+            if (!state.simpleMode) {
+                Divider()
 
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                SectionHeader(Icons.Filled.Sync, SectionPurple, "Catálogo")
-                Text(stringResource(R.string.settings_remote_catalog), style = MaterialTheme.typography.titleMedium)
-                OutlinedTextField(
-                    value = state.remoteCatalogUrl,
-                    onValueChange = viewModel::onRemoteUrlChange,
-                    label = { Text(stringResource(R.string.settings_remote_catalog_url)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                )
-                Button(onClick = viewModel::refreshRemoteCatalog, enabled = !state.isSyncing) {
-                    if (state.isSyncing) {
-                        CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp), strokeWidth = 2.dp)
-                    }
-                    Text(stringResource(R.string.settings_remote_catalog_refresh))
-                }
-                val lastSyncText = state.lastSyncMillis?.let {
-                    DateFormat.getDateTimeInstance().format(Date(it))
-                } ?: stringResource(R.string.settings_remote_catalog_never)
-                Text(
-                    text = stringResource(R.string.settings_remote_catalog_last_sync, lastSyncText),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                state.syncMessage?.let { message ->
-                    Text(
-                        text = message,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (state.syncFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SectionHeader(Icons.Filled.Sync, SectionPurple, "Catálogo")
+                    Text(stringResource(R.string.settings_remote_catalog), style = MaterialTheme.typography.titleMedium)
+                    OutlinedTextField(
+                        value = state.remoteCatalogUrl,
+                        onValueChange = viewModel::onRemoteUrlChange,
+                        label = { Text(stringResource(R.string.settings_remote_catalog_url)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
                     )
+                    Button(onClick = viewModel::refreshRemoteCatalog, enabled = !state.isSyncing) {
+                        if (state.isSyncing) {
+                            CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp), strokeWidth = 2.dp)
+                        }
+                        Text(stringResource(R.string.settings_remote_catalog_refresh))
+                    }
+                    val lastSyncText = state.lastSyncMillis?.let {
+                        DateFormat.getDateTimeInstance().format(Date(it))
+                    } ?: stringResource(R.string.settings_remote_catalog_never)
+                    Text(
+                        text = stringResource(R.string.settings_remote_catalog_last_sync, lastSyncText),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    state.syncMessage?.let { message ->
+                        Text(
+                            text = message,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (state.syncFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
             }
 
@@ -341,6 +352,34 @@ private fun UpdateSection() {
                 }
             },
         )
+    }
+}
+
+/**
+ * Interruptor del modo simple: reduce Inicio a "ahora suena" + favoritas en
+ * tarjetas grandes, quita Explorar/Añadir emisora/Catálogo remoto de en
+ * medio, y deja la barra inferior solo en Inicio/Ajustes. Pensado para
+ * quien configura la app para un familiar mayor: se activa una vez, con
+ * las favoritas ya elegidas, y el usuario final ya no ve nada más.
+ */
+@Composable
+private fun SimpleModeSection(enabled: Boolean, onEnabledChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.padding(end = 16.dp)) {
+            Text(
+                text = "Muestra solo las emisoras favoritas en tarjetas grandes y un botón de " +
+                    "Reproducir/Pausa enorme. Se ocultan Explorar, Añadir emisora y el catálogo " +
+                    "remoto. Ideal para dejar la app lista para alguien que solo quiere poner " +
+                    "su emisora sin liarse con el resto.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = enabled, onCheckedChange = onEnabledChange)
     }
 }
 

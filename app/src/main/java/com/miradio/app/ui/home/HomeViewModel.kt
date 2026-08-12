@@ -34,6 +34,9 @@ data class HomeUiState(
     /** Últimas emisoras escuchadas, la más reciente primero. */
     val recentStations: List<RadioStation> = emptyList(),
     val isLoading: Boolean = true,
+    /** Con el modo simple activo, Inicio se reduce a "ahora suena" +
+     *  favoritas en tarjetas grandes, sin acceso a Explorar/Añadir emisora. */
+    val simpleMode: Boolean = false,
 ) {
     val displayedStation: RadioStation? get() = player.station ?: lastStation
 }
@@ -73,6 +76,8 @@ class HomeViewModel(
         state.copy(
             recentStations = recentIds.mapNotNull { id -> state.allStations.find { it.id == id } },
         )
+    }.combine(container.preferencesRepository.simpleMode) { state, simple ->
+        state.copy(simpleMode = simple)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 
     init {

@@ -62,13 +62,14 @@ class MainActivity : FragmentActivity() {
             // densidad de Compose en vez de multiplicarlo, para que no se
             // sume con el ajuste de accesibilidad de Android.
             val textScale by container.preferencesRepository.textScale.collectAsState(initial = 1f)
+            val simpleMode by container.preferencesRepository.simpleMode.collectAsState(initial = false)
             val density = LocalDensity.current
 
             MiRadioTheme(themeMode = themeMode) {
                 CompositionLocalProvider(
                     LocalDensity provides Density(density.density, fontScale = textScale),
                 ) {
-                    MiRadioApp()
+                    MiRadioApp(simpleMode = simpleMode)
                 }
             }
         }
@@ -113,7 +114,7 @@ class MainActivity : FragmentActivity() {
 }
 
 @Composable
-private fun MiRadioApp() {
+private fun MiRadioApp(simpleMode: Boolean) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -127,7 +128,7 @@ private fun MiRadioApp() {
                     // navegación, visible en Inicio/Favoritos/Explorar/Ajustes;
                     // se oculta ella sola si todavía no ha sonado nada.
                     MiniPlayerBar(onClick = { navController.navigate(Routes.PLAYER) })
-                    RadioBottomBar(navController)
+                    RadioBottomBar(navController, simpleMode = simpleMode)
                 }
             }
         },

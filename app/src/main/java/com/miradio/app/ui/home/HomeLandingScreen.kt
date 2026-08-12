@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -41,13 +43,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.miradio.app.R
 import com.miradio.app.domain.model.OutputDevice
+import com.miradio.app.domain.model.RadioStation
 import com.miradio.app.ui.components.CastButton
 import com.miradio.app.ui.components.PlayerCard
 import com.miradio.app.ui.components.RecentStationChip
+import com.miradio.app.ui.components.StationLogo
 
 /**
  * Pantalla de Inicio curada: "ahora suena", últimas escuchadas y accesos
@@ -99,8 +104,13 @@ fun HomeLandingScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onAddStation) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.home_add_station))
+            // Añadir/editar emisoras es una acción avanzada: en modo simple
+            // se oculta para que no haya nada que se pueda tocar sin querer
+            // y desconfigure la app de quien solo quiere escuchar la radio.
+            if (!state.simpleMode) {
+                FloatingActionButton(onClick = onAddStation) {
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.home_add_station))
+                }
             }
         },
     ) { padding ->
@@ -130,77 +140,168 @@ fun HomeLandingScreen(
                     .fillMaxWidth(),
             )
 
-            // No es un campo de texto: es un botón que lleva a Explorar,
-            // donde sí se puede escribir y filtrar sobre el catálogo
-            // completo. Sin ">" al final se confundía con un buscador vacío
-            // en el que se podía tocar para escribir directamente.
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .clickable(onClick = onOpenExplore)
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Icon(Icons.Filled.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(
-                    text = stringResource(R.string.home_search_hint),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
+            if (state.simpleMode) {
+                SimpleModeFavorites(
+                    favorites = state.allStations.filter { it.isFavorite },
+                    playingStationId = state.player.station?.id,
+                    onStationClick = viewModel::onStationClick,
                 )
-                Icon(
-                    Icons.Filled.ChevronRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            if (state.recentStations.isNotEmpty()) {
+            } else {
+                // No es un campo de texto: es un botón que lleva a Explorar,
+                // donde sí se puede escribir y filtrar sobre el catálogo
+                // completo. Sin ">" al final se confundía con un buscador
+                // vacío en el que se podía tocar para escribir directamente.
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable(onClick = onOpenExplore)
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Text(stringResource(R.string.home_recent), style = MaterialTheme.typography.titleMedium)
+                    Icon(Icons.Filled.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        text = stringResource(R.string.home_search_hint),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Icon(
+                        Icons.Filled.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
+
+                if (state.recentStations.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(stringResource(R.string.home_recent), style = MaterialTheme.typography.titleMedium)
+                    }
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
+                    ) {
+                        items(state.recentStations, key = { it.id }) { station ->
+                            RecentStationChip(
+                                station = station,
+                                isPlaying = state.player.station?.id == station.id,
+                                onClick = { viewModel.onStationClick(station) },
+                            )
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(state.recentStations, key = { it.id }) { station ->
-                        RecentStationChip(
+                    QuickAccessCard(
+                        icon = Icons.Filled.Favorite,
+                        title = stringResource(R.string.home_favorites),
+                        subtitle = stringResource(R.string.home_favorites_count, favoritesCount),
+                        onClick = onOpenFavorites,
+                        modifier = Modifier.weight(1f),
+                    )
+                    QuickAccessCard(
+                        icon = Icons.Filled.Explore,
+                        title = stringResource(R.string.home_explore_all),
+                        subtitle = stringResource(R.string.home_explore_count, state.allStations.size),
+                        onClick = onOpenExplore,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Contenido de Inicio en modo simple: solo las emisoras favoritas, como
+ * tarjetas grandes en una rejilla de 2 columnas (logo grande + nombre), sin
+ * nada más que tocar. Si todavía no hay ninguna favorita, se explica cómo
+ * elegirlas en vez de dejar la pantalla vacía sin explicación.
+ */
+@Composable
+private fun SimpleModeFavorites(
+    favorites: List<RadioStation>,
+    playingStationId: String?,
+    onStationClick: (RadioStation) -> Unit,
+) {
+    Column(modifier = Modifier.padding(16.dp)) {
+        Text(stringResource(R.string.home_favorites), style = MaterialTheme.typography.titleMedium)
+        if (favorites.isEmpty()) {
+            Text(
+                text = stringResource(R.string.home_simple_empty),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        } else {
+            favorites.chunked(2).forEach { rowStations ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    rowStations.forEach { station ->
+                        FavoriteStationTile(
                             station = station,
-                            isPlaying = state.player.station?.id == station.id,
-                            onClick = { viewModel.onStationClick(station) },
+                            isPlaying = playingStationId == station.id,
+                            onClick = { onStationClick(station) },
+                            modifier = Modifier.weight(1f),
                         )
+                    }
+                    // Si la fila queda con una sola tarjeta (número impar de
+                    // favoritas), se rellena el hueco para que no se estire
+                    // a todo el ancho de forma descompensada.
+                    if (rowStations.size == 1) {
+                        Spacer(modifier = Modifier.weight(1f))
                     }
                 }
             }
+        }
+    }
+}
 
-            Row(
+@Composable
+private fun FavoriteStationTile(
+    station: RadioStation,
+    isPlaying: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier,
+        colors = CardDefaults.cardColors(
+            containerColor = if (isPlaying) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            StationLogo(
+                logoUrl = station.logoUrl,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                QuickAccessCard(
-                    icon = Icons.Filled.Favorite,
-                    title = stringResource(R.string.home_favorites),
-                    subtitle = stringResource(R.string.home_favorites_count, favoritesCount),
-                    onClick = onOpenFavorites,
-                    modifier = Modifier.weight(1f),
-                )
-                QuickAccessCard(
-                    icon = Icons.Filled.Explore,
-                    title = stringResource(R.string.home_explore_all),
-                    subtitle = stringResource(R.string.home_explore_count, state.allStations.size),
-                    onClick = onOpenExplore,
-                    modifier = Modifier.weight(1f),
-                )
-            }
+                    .aspectRatio(1f),
+                cornerRadius = 16,
+            )
+            Text(
+                text = station.name,
+                style = MaterialTheme.typography.titleMedium,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                modifier = Modifier.padding(top = 10.dp),
+            )
         }
     }
 }

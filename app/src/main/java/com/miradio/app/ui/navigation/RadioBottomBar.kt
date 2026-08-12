@@ -30,13 +30,19 @@ private val tabs = listOf(
  *  la pantalla de reproducción y los formularios de emisora ocupan toda la pantalla. */
 val bottomBarRoutes = tabs.map { it.route }.toSet()
 
+/** Con el modo simple activo, la barra se reduce a Inicio/Ajustes: Favoritos
+ *  y Explorar ya no son pestañas propias, Inicio pasa a ser el propio
+ *  listado de favoritas en grande. */
+private val simpleModeTabs = tabs.filter { it.route == Routes.HOME || it.route == Routes.SETTINGS }
+
 @Composable
-fun RadioBottomBar(navController: NavHostController) {
+fun RadioBottomBar(navController: NavHostController, simpleMode: Boolean = false) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+    val visibleTabs = if (simpleMode) simpleModeTabs else tabs
 
     NavigationBar {
-        tabs.forEach { tab ->
+        visibleTabs.forEach { tab ->
             NavigationBarItem(
                 selected = currentRoute == tab.route,
                 onClick = {
