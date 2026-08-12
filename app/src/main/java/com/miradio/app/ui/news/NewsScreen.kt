@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -25,6 +26,8 @@ import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.TextDecrease
+import androidx.compose.material.icons.filled.TextIncrease
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -53,6 +56,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -198,11 +202,18 @@ private fun NewsArticleCard(article: NewsArticle, onClick: () -> Unit) {
 
 /** Detalle a pantalla completa: título, foto e íntegro el resumen del RSS,
  *  con la opción (nunca obligatoria) de abrir la noticia completa en el
- *  navegador si se quiere leer más de lo que trae el resumen. */
+ *  navegador si se quiere leer más de lo que trae el resumen. Incluye un
+ *  control de tamaño de letra propio (independiente del de Ajustes) para
+ *  poder agrandar solo el texto de la noticia sin tocar el resto de la app. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NewsDetailDialog(article: NewsArticle, onDismiss: () -> Unit) {
     val context = LocalContext.current
+    // 1.15f de partida: algo más grande que el cuerpo de texto normal de la
+    // app, pensado para que se lea cómodo desde el principio sin tener que
+    // tocar nada. Con los botones A-/A+ se puede ajustar entre 0.85x y 1.85x.
+    var textScale by remember { mutableStateOf(1.15f) }
+
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Scaffold(
             topBar = {
@@ -211,6 +222,18 @@ private fun NewsDetailDialog(article: NewsArticle, onDismiss: () -> Unit) {
                     navigationIcon = {
                         IconButton(onClick = onDismiss) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        }
+                    },
+                    actions = {
+                        IconButton(
+                            onClick = { textScale = (textScale - 0.15f).coerceAtLeast(0.85f) },
+                        ) {
+                            Icon(Icons.Filled.TextDecrease, contentDescription = "Letra más pequeña")
+                        }
+                        IconButton(
+                            onClick = { textScale = (textScale + 0.15f).coerceAtMost(1.85f) },
+                        ) {
+                            Icon(Icons.Filled.TextIncrease, contentDescription = "Letra más grande")
                         }
                     },
                 )
@@ -230,8 +253,22 @@ private fun NewsDetailDialog(article: NewsArticle, onDismiss: () -> Unit) {
                         modifier = Modifier.fillMaxWidth().aspectRatio(16f / 10f),
                     )
                 }
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Text(text = article.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Column(
+                    modifier = Modifier
+                        .padding(20.dp)
+                        // Sin esto, en móviles con navegación por gestos el
+                        // botón de "Leer completa" quedaba pegado (a veces
+                        // tapado) por la barra del sistema, justo lo que se
+                        // reportó.
+                        .navigationBarsPadding(),
+                ) {
+                    Text(
+                        text = article.title,
+                        style = MaterialTheme.typography.headlineSmall.copy(
+                            fontSize = (MaterialTheme.typography.headlineSmall.fontSize.value * textScale).sp,
+                        ),
+                        fontWeight = FontWeight.Bold,
+                    )
                     val subtitle = listOfNotNull("COPE", formatRelativeTime(article.pubDate)).joinToString(" · ")
                     Text(
                         text = subtitle,
@@ -240,13 +277,18 @@ private fun NewsDetailDialog(article: NewsArticle, onDismiss: () -> Unit) {
                         modifier = Modifier.padding(top = 6.dp, bottom = 16.dp),
                     )
                     article.description?.let { description ->
-                        Text(text = description, style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            text = description,
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontSize = (MaterialTheme.typography.bodyLarge.fontSize.value * textScale).sp,
+                            ),
+                        )
                     }
                     OutlinedButton(
                         onClick = {
                             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(article.link)))
                         },
-                        modifier = Modifier.padding(top = 24.dp),
+                        modifier = Modifier.padding(top = 24.dp, bottom = 8.dp),
                     ) {
                         Icon(Icons.Filled.OpenInBrowser, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
                         Text("Leer completa en cope.es")
