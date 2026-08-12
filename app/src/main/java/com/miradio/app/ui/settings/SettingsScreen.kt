@@ -19,9 +19,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Accessibility
 import androidx.compose.material.icons.filled.Apps
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDone
@@ -35,9 +35,9 @@ import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -97,7 +97,7 @@ fun SettingsScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.settings_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, contentDescription = null) }
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null) }
                 },
             )
         },
@@ -115,7 +115,7 @@ fun SettingsScreen(
                 SimpleModeSection(enabled = state.simpleMode, onEnabledChange = viewModel::onSimpleModeChange)
             }
 
-            Divider()
+            HorizontalDivider()
 
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 SectionHeader(Icons.Filled.Palette, SectionPurple, "Apariencia")
@@ -124,7 +124,7 @@ fun SettingsScreen(
             }
 
             if (!state.simpleMode) {
-                Divider()
+                HorizontalDivider()
 
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SectionHeader(Icons.Filled.Sync, SectionPurple, "Catálogo")
@@ -160,7 +160,7 @@ fun SettingsScreen(
                 }
             }
 
-            Divider()
+            HorizontalDivider()
 
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 SectionHeader(Icons.Filled.Apps, SectionBlue, "Aplicación")
@@ -180,7 +180,7 @@ fun SettingsScreen(
             }
 
             if (state.debugMode) {
-                Divider()
+                HorizontalDivider()
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SectionHeader(Icons.Filled.Shield, SectionPurple, "Diagnóstico")
                     DiagnosticsSection()

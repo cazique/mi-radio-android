@@ -12,6 +12,7 @@ import com.miradio.app.domain.model.RadioStation
 import com.miradio.app.playback.PlaybackController
 import com.miradio.app.playback.PlaybackServiceConnector
 import com.miradio.app.ui.util.radioApp
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -30,6 +31,7 @@ class PlayerViewModel(
     private val container: AppContainer,
 ) : AndroidViewModel(application) {
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<PlayerScreenState> = combine(
         PlaybackServiceConnector.player.flatMapLatest { it?.uiState ?: flowOf(PlayerUiState()) },
         container.stationRepository.stations,

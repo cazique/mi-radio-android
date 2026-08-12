@@ -49,6 +49,7 @@ class HomeViewModel(
     private val searchQuery = MutableStateFlow("")
     private val favoritesOnly = MutableStateFlow(false)
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val uiState = combine(
         container.stationRepository.stations,
         searchQuery,

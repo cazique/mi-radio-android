@@ -30,7 +30,6 @@ class PreferencesRepository(private val context: Context) {
         val REMOTE_CATALOG_URL = stringPreferencesKey("remote_catalog_url")
         val LAST_SYNC_MILLIS = longPreferencesKey("last_sync_millis")
         val THEME_MODE = stringPreferencesKey("theme_mode")
-        val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         val PLAYBACK_DELAY_SECONDS = intPreferencesKey("playback_delay_seconds")
         val TEXT_SCALE = floatPreferencesKey("text_scale")
         val RECENT_STATION_IDS = stringPreferencesKey("recent_station_ids")
@@ -57,8 +56,6 @@ class PreferencesRepository(private val context: Context) {
         prefs[Keys.THEME_MODE]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() }
             ?: ThemeMode.SYSTEM
     }
-
-    val dynamicColor: Flow<Boolean> = context.dataStore.data.map { it[Keys.DYNAMIC_COLOR] ?: true }
 
     /** Retardo (en segundos) con el que se reproduce el directo en el móvil,
      *  p. ej. para sincronizar la radio con una emisión de televisión. */
@@ -113,10 +110,6 @@ class PreferencesRepository(private val context: Context) {
 
     suspend fun setThemeMode(mode: ThemeMode) {
         context.dataStore.edit { it[Keys.THEME_MODE] = mode.name }
-    }
-
-    suspend fun setDynamicColor(enabled: Boolean) {
-        context.dataStore.edit { it[Keys.DYNAMIC_COLOR] = enabled }
     }
 
     suspend fun setPlaybackDelaySeconds(seconds: Int) {
