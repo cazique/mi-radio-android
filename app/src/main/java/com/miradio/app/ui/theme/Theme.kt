@@ -26,7 +26,12 @@ private val LightColors = lightColorScheme(
 
 private val DarkColors = darkColorScheme(
     primary = RadioBluePrimaryDark,
-    onPrimary = DarkOnBackground,
+    // OJO: RadioBluePrimaryDark es un azul pastel CLARO (a propósito, para
+    // que resalte como texto/tinte sobre fondos oscuros). Como color de
+    // FONDO de un botón relleno necesita texto oscuro encima, no claro: con
+    // DarkOnBackground (casi blanco) el texto quedaba casi invisible sobre
+    // ese mismo azul claro.
+    onPrimary = DarkBackground,
     secondary = RadioOrangeAccent,
     onSecondary = DarkBackground,
     background = DarkBackground,
