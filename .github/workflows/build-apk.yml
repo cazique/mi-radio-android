@@ -46,14 +46,31 @@ jobs:
 
       # Room (vía KSP, disparado por el paso de compilar arriba) deja aquí
       # el JSON del esquema de la base de datos de esta versión. Se sube
-      # como artefacto para poder bajarlo y comitearlo a app/schemas/ en el
-      # repo (sirve de base para escribir y probar migraciones reales la
-      # próxima vez que cambie StationEntity).
+      # como artefacto (para poder verlo desde la pestaña Actions) y además
+      # se comitea directamente a app/schemas/ en el repo si ha cambiado:
+      # sirve de base para escribir y probar migraciones reales la próxima
+      # vez que cambie StationEntity. "[skip ci]" en el mensaje evita que
+      # este propio commit dispare otra ejecución del workflow.
       - name: Guardar el esquema de Room como artefacto de esta ejecución
         uses: actions/upload-artifact@v4
         with:
           name: room-schemas
           path: app/schemas/
+
+      - name: Comitear el esquema de Room al repo si ha cambiado
+        run: |
+          # git diff no sirve aquí solo: no detecta archivos nuevos sin
+          # trackear (que es justo el caso la primera vez, cuando
+          # app/schemas/ todavía no existe en el repo). git status sí.
+          if [ -n "$(git status --porcelain -- app/schemas)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add app/schemas
+            git commit -m "chore: actualiza el esquema de Room [skip ci]"
+            git push
+          else
+            echo "Sin cambios en app/schemas, nada que comitear."
+          fi
 
       - name: Publicar el APK en una "Release" de descarga directa
         uses: softprops/action-gh-release@v2
