@@ -1,5 +1,6 @@
 package com.miradio.app.playback
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Intent
@@ -13,11 +14,13 @@ import androidx.core.content.getSystemService
 import androidx.media3.common.MediaItem
 import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
+import androidx.media3.session.MediaNotification
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionResult
 import com.google.android.gms.cast.framework.CastContext
+import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.miradio.app.R
@@ -217,12 +220,17 @@ class PlaybackService : MediaSessionService() {
 
             // A partir de aquí, Media3 gestiona la notificación real (portada,
             // controles) reutilizando el mismo canal e id que la provisional.
+            // Envuelta en OngoingWhilePlayingNotificationProvider para que no
+            // se pueda deslizar y quitar mientras la radio sigue sonando (ver
+            // su documentación más abajo).
             setMediaNotificationProvider(
-                DefaultMediaNotificationProvider.Builder(this)
-                    .setChannelId(CHANNEL_ID)
-                    .setChannelName(R.string.playback_channel_name)
-                    .setNotificationId(NOTIFICATION_ID)
-                    .build(),
+                OngoingWhilePlayingNotificationProvider(
+                    DefaultMediaNotificationProvider.Builder(this)
+                        .setChannelId(CHANNEL_ID)
+                        .setChannelName(R.string.playback_channel_name)
+                        .setNotificationId(NOTIFICATION_ID)
+                        .build(),
+                ),
             )
 
             PlaybackServiceConnector.attach(radioPlayer)
@@ -356,5 +364,35 @@ class PlaybackService : MediaSessionService() {
     companion object {
         const val ACTION_TOGGLE_PLAY_PAUSE = "com.miradio.app.action.TOGGLE_PLAY_PAUSE"
         const val ACTION_NEXT_STATION = "com.miradio.app.action.NEXT_STATION"
+    }
+}
+
+/**
+ * A partir de Android 14, una notificación de servicio en primer plano ya no
+ * es "fija" por defecto: el usuario puede deslizarla y quitarla, y la radio
+ * se queda sonando de fondo sin ninguna notificación con la que volver a
+ * ella o pausarla (justo lo que se reportaba: "al borrarla, desaparece
+ * aunque siga sonando"). Se envuelve el proveedor por defecto de Media3 para
+ * fijar esa notificación (FLAG_ONGOING_EVENT) mientras haya reproducción
+ * activa, y dejarla deslizable en cuanto se pausa o se para, como en
+ * cualquier reproductor de música.
+ */
+@androidx.media3.common.util.UnstableApi
+private class OngoingWhilePlayingNotificationProvider(
+    private val delegate: DefaultMediaNotificationProvider,
+) : MediaNotification.Provider by delegate {
+    override fun createNotification(
+        mediaSession: MediaSession,
+        customLayout: ImmutableList<CommandButton>,
+        actionFactory: MediaNotification.ActionFactory,
+        onNotificationChangedCallback: MediaNotification.Provider.Callback,
+    ): MediaNotification {
+        val result = delegate.createNotification(mediaSession, customLayout, actionFactory, onNotificationChangedCallback)
+        result.notification.flags = if (mediaSession.player.isPlaying) {
+            result.notification.flags or Notification.FLAG_ONGOING_EVENT
+        } else {
+            result.notification.flags and Notification.FLAG_ONGOING_EVENT.inv()
+        }
+        return result
     }
 }
