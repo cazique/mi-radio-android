@@ -12,6 +12,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.getSystemService
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaNotification
@@ -225,7 +226,8 @@ class PlaybackService : MediaSessionService() {
             // su documentación más abajo).
             setMediaNotificationProvider(
                 OngoingWhilePlayingNotificationProvider(
-                    DefaultMediaNotificationProvider.Builder(this)
+                    context = this,
+                    delegate = DefaultMediaNotificationProvider.Builder(this)
                         .setChannelId(CHANNEL_ID)
                         .setChannelName(R.string.playback_channel_name)
                         .setNotificationId(NOTIFICATION_ID)
@@ -379,6 +381,7 @@ class PlaybackService : MediaSessionService() {
  */
 @androidx.media3.common.util.UnstableApi
 private class OngoingWhilePlayingNotificationProvider(
+    private val context: android.content.Context,
     private val delegate: DefaultMediaNotificationProvider,
 ) : MediaNotification.Provider by delegate {
     override fun createNotification(
@@ -388,11 +391,28 @@ private class OngoingWhilePlayingNotificationProvider(
         onNotificationChangedCallback: MediaNotification.Provider.Callback,
     ): MediaNotification {
         val result = delegate.createNotification(mediaSession, customLayout, actionFactory, onNotificationChangedCallback)
-        result.notification.flags = if (mediaSession.player.isPlaying) {
+        // OJO: Player.isPlaying exige STATE_READY; en un stream de radio en
+        // directo, un simple bache de red pone al reproductor en
+        // STATE_BUFFERING con isPlaying=false aunque el usuario lo siga
+        // "teniendo puesto" (playWhenReady sigue en true). Con isPlaying a
+        // secas, la notificación se volvía deslizable en cada rebuffering
+        // y se podía cerrar aunque la radio siguiera con intención de sonar
+        // (justo lo reportado: "se puede borrar mientras reproduce").
+        val player = mediaSession.player
+        val isActive = player.playWhenReady && player.playbackState != Player.STATE_IDLE
+        result.notification.flags = if (isActive) {
             result.notification.flags or Notification.FLAG_ONGOING_EVENT
         } else {
             result.notification.flags and Notification.FLAG_ONGOING_EVENT.inv()
         }
+        // Diagnóstico temporal: para poder confirmar en el próximo registro
+        // si esto es lo único que fallaba o si, además, Media3 tarda en
+        // sustituir la notificación provisional por esta de verdad.
+        DiagnosticsLog.log(
+            context,
+            "PlaybackService",
+            "Notificación actualizada: título=\"${player.mediaMetadata.title}\" activa=$isActive estado=${player.playbackState}",
+        )
         return result
     }
 }
