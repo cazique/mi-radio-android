@@ -153,6 +153,10 @@ fun HomeLandingScreen(
                 onPlayPauseClick = { viewModel.onPrimaryPlayClick(state) },
                 onCardClick = if (state.displayedStation != null && !state.simpleMode) onOpenPlayer else null,
                 nowPlayingTitle = state.player.nowPlayingTitle,
+                onPreviousStation = { viewModel.onSkipStation(-1) },
+                onNextStation = { viewModel.onSkipStation(1) },
+                volume = state.player.volume,
+                onVolumeChange = viewModel::onVolumeChange,
                 modifier = Modifier
                     .padding(horizontal = 16.dp)
                     .fillMaxWidth(),

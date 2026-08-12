@@ -127,6 +127,21 @@ class HomeViewModel(
         }
     }
 
+    /** Emisora anterior/siguiente dentro del catálogo completo, para los
+     *  botones ⏮ ⏭ de la tarjeta principal de Inicio. */
+    fun onSkipStation(delta: Int) {
+        val state = uiState.value
+        val current = state.player.station ?: return
+        val list = state.allStations
+        val index = list.indexOfFirst { it.id == current.id }
+        if (index == -1 || list.isEmpty()) return
+        onStationClick(list[(index + delta + list.size) % list.size])
+    }
+
+    fun onVolumeChange(volume: Float) {
+        PlaybackServiceConnector.player.value?.setVolume(volume)
+    }
+
     companion object {
         val Factory = viewModelFactory {
             initializer {

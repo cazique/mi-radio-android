@@ -1,6 +1,8 @@
 package com.miradio.app.ui.settings
 
 import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -29,8 +31,12 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Sync
@@ -51,6 +57,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -64,11 +71,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.app.NotificationManagerCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.miradio.app.BuildConfig
 import com.miradio.app.R
@@ -178,6 +189,12 @@ fun SettingsScreen(
                 }
 
                 UpdateSection()
+
+                ChangelogSection()
+
+                NotificationSettingsSection()
+
+                ClearCacheSection()
 
                 DebugModeSection(enabled = state.debugMode, onEnabledChange = viewModel::onDebugModeChange)
             }
@@ -355,6 +372,122 @@ private fun UpdateSection() {
                 }
             },
         )
+    }
+}
+
+/**
+ * No hay una pantalla de "novedades de esta versión" dentro de la app (no
+ * hay dónde guardar ese texto sin inventarlo), pero sí existe de verdad en
+ * GitHub: cada compilación publicada queda como una entrada con sus commits.
+ * Un enlace directo ahí es más honesto que un changelog redactado a mano
+ * que se quedaría desactualizado.
+ */
+@Composable
+private fun ChangelogSection() {
+    val context = LocalContext.current
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Historial de cambios", style = MaterialTheme.typography.titleMedium)
+        Text(
+            text = "Ver qué ha cambiado en cada versión publicada.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedButton(onClick = {
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/cazique/mi-radio-android/commits/main")),
+            )
+        }) {
+            Icon(Icons.Filled.History, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+            Text("Ver historial de cambios")
+        }
+    }
+}
+
+/**
+ * Si el permiso de notificaciones está desactivado, Android no puede
+ * mostrar la emisora que suena ni los controles de pausa en la barra de
+ * notificaciones (sustituye la notificación real por un aviso genérico del
+ * sistema): se explica aquí, con acceso directo a activarlo, en vez de
+ * dejarlo como un misterio.
+ */
+@Composable
+private fun NotificationSettingsSection() {
+    val context = LocalContext.current
+    var enabled by remember { mutableStateOf(NotificationManagerCompat.from(context).areNotificationsEnabled()) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                enabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Notificaciones", style = MaterialTheme.typography.titleMedium)
+        Text(
+            text = if (enabled) {
+                "Activadas: se muestra la emisora que suena y los controles de pausa en la notificación."
+            } else {
+                "Desactivadas: Android no puede mostrar la emisora ni los controles mientras suena."
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+        )
+        if (!enabled) {
+            OutlinedButton(onClick = {
+                context.startActivity(
+                    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
+                )
+            }) {
+                Icon(Icons.Filled.NotificationsOff, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+                Text("Activar notificaciones")
+            }
+        } else {
+            Icon(Icons.Filled.Notifications, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
+/** Borra los archivos temporales propios (APK de actualizaciones ya
+ *  instaladas, etc.): no afecta a favoritos, emisoras ni ajustes, que viven
+ *  en almacenamiento aparte y nunca se tocan aquí. */
+@Composable
+private fun ClearCacheSection() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var cacheSizeLabel by remember { mutableStateOf(formatCacheSize(context)) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Almacenamiento", style = MaterialTheme.typography.titleMedium)
+        Text(
+            text = "Archivos temporales (actualizaciones descargadas, imágenes en caché): $cacheSizeLabel.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedButton(onClick = {
+            scope.launch {
+                withContext(Dispatchers.IO) { context.cacheDir?.deleteRecursively() }
+                cacheSizeLabel = formatCacheSize(context)
+                Toast.makeText(context, "Caché borrada", Toast.LENGTH_SHORT).show()
+            }
+        }) {
+            Icon(Icons.Filled.DeleteSweep, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+            Text("Borrar caché")
+        }
+    }
+}
+
+private fun formatCacheSize(context: android.content.Context): String {
+    val bytes = context.cacheDir?.walkTopDown()?.filter { it.isFile }?.sumOf { it.length() } ?: 0L
+    return when {
+        bytes < 1024 -> "$bytes B"
+        bytes < 1024 * 1024 -> "${bytes / 1024} KB"
+        else -> String.format(java.util.Locale.getDefault(), "%.1f MB", bytes / 1024.0 / 1024.0)
     }
 }
 
