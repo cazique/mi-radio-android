@@ -26,13 +26,18 @@ sealed class VoiceCommand {
 
 object VoiceCommandParser {
 
+    // "retardo" y "retraso" son ambos válidos en español para lo mismo
+    // ("retardo" es el término técnico que usa la propia app en Ajustes,
+    // pero la mayoría dice "retraso" al hablar); (?:...) sin capturar para
+    // no desplazar la numeración de los grupos que sí se usan más abajo.
+    private val delayWord = "(?:retard[oa]|retras[oa])"
     private val delayPhraseRegex = Regex(
-        "\\bcon\\s+(un\\s+)?retard[oa]?\\s+de\\s+(\\d+)\\s*segundos?\\b|" +
-            "\\bcon\\s+(\\d+)\\s*segundos?\\s+de\\s+retard[oa]?\\b|" +
+        "\\bcon\\s+(un\\s+)?$delayWord\\s+de\\s+(\\d+)\\s*segundos?\\b|" +
+            "\\bcon\\s+(\\d+)\\s*segundos?\\s+de\\s+$delayWord\\b|" +
             "\\bretrasad[oa]\\s+(\\d+)\\s*segundos?\\b",
     )
     private val delayOnlyRegex = Regex(
-        "\\b(retrasa|retrasar|retardo|retardar|atrasa|atrasar|pon)\\b.*\\b(\\d+)\\s*segundos?\\b",
+        "\\b(retrasa|retrasar|retardo|retardar|retraso|atrasa|atrasar|pon)\\b.*\\b(\\d+)\\s*segundos?\\b",
     )
     private val clearDelayRegex = Regex(
         "\\b(anula|anular|quita|quitar|cancela|cancelar|desactiva|desactivar|elimina|eliminar)\\b.*\\b(retard|retras)",
