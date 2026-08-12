@@ -44,6 +44,17 @@ jobs:
           name: mi-radio-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
 
+      # Room (vía KSP, disparado por el paso de compilar arriba) deja aquí
+      # el JSON del esquema de la base de datos de esta versión. Se sube
+      # como artefacto para poder bajarlo y comitearlo a app/schemas/ en el
+      # repo (sirve de base para escribir y probar migraciones reales la
+      # próxima vez que cambie StationEntity).
+      - name: Guardar el esquema de Room como artefacto de esta ejecución
+        uses: actions/upload-artifact@v4
+        with:
+          name: room-schemas
+          path: app/schemas/
+
       - name: Publicar el APK en una "Release" de descarga directa
         uses: softprops/action-gh-release@v2
         with:

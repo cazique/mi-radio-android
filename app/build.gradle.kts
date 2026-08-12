@@ -105,6 +105,14 @@ android {
     }
 }
 
+// Room (vía KSP) vuelca aquí un JSON con el esquema exacto de cada versión
+// de la base de datos. Sin esto no hay forma de escribir ni probar
+// migraciones reales: una Migration(from, to) necesita saber exactamente
+// cómo era el esquema "from" para poder comprobarse contra él.
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.10.01")
     implementation(composeBom)
