@@ -199,6 +199,7 @@ private fun NewsArticleCard(article: NewsArticle, onClick: () -> Unit) {
 /** Detalle a pantalla completa: título, foto e íntegro el resumen del RSS,
  *  con la opción (nunca obligatoria) de abrir la noticia completa en el
  *  navegador si se quiere leer más de lo que trae el resumen. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NewsDetailDialog(article: NewsArticle, onDismiss: () -> Unit) {
     val context = LocalContext.current
