@@ -7,6 +7,12 @@ name: Compilar APK
 on:
   push:
     branches: [main]
+    # OJO: con paths-ignore activo, un commit vacío (git commit --allow-empty)
+    # NO dispara este workflow (GitHub no tiene ningún archivo que comparar
+    # contra el filtro). Para forzar un reintento tras un fallo de
+    # infraestructura (p. ej. un corte de red al descargar Gradle) hace
+    # falta un commit con algún cambio real, o el botón "Run workflow" de
+    # abajo si tienes acceso a la pestaña Actions.
     paths-ignore:
       - "**.md"
   workflow_dispatch:
