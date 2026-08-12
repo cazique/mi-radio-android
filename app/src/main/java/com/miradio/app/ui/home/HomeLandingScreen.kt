@@ -1,5 +1,7 @@
 package com.miradio.app.ui.home
 
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,10 +21,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
@@ -33,18 +37,29 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.app.NotificationManagerCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.miradio.app.R
 import com.miradio.app.domain.model.OutputDevice
@@ -120,6 +135,8 @@ fun HomeLandingScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState()),
         ) {
+            NotificationPermissionBanner()
+
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 DeviceIndicator(
                     deviceName = if (state.player.outputDevice == OutputDevice.CAST) {
@@ -218,6 +235,77 @@ fun HomeLandingScreen(
                         onClick = onOpenExplore,
                         modifier = Modifier.weight(1f),
                     )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Sin permiso de notificaciones, Android sustituye la notificación real
+ * (portada, emisora, controles de pausa) por un aviso genérico del sistema
+ * sin nada de eso, y sin dar ninguna pista de por qué. Esto explica el
+ * "solo aparece Radio Dari sin controles" reportado: se detecta el caso y
+ * se ofrece un atajo directo a los ajustes de notificaciones de la app en
+ * vez de dejar al usuario sin explicación.
+ */
+@Composable
+private fun NotificationPermissionBanner() {
+    val context = LocalContext.current
+    var notificationsEnabled by remember { mutableStateOf(NotificationManagerCompat.from(context).areNotificationsEnabled()) }
+    var dismissed by remember { mutableStateOf(false) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Se vuelve a comprobar cada vez que la app pasa a primer plano, por si
+    // el usuario activó el permiso desde Ajustes del sistema y vuelve.
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                notificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    if (!notificationsEnabled && !dismissed) {
+        Surface(
+            color = MaterialTheme.colorScheme.errorContainer,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        ) {
+            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Filled.NotificationsOff,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                )
+                Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                    Text(
+                        text = "Notificación de la emisora desactivada",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                    Text(
+                        text = "Sin permiso de notificaciones, Android no puede mostrar la emisora que suena ni los controles de pausa en la barra de notificaciones.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                    TextButton(
+                        onClick = {
+                            context.startActivity(
+                                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                    .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
+                            )
+                        },
+                        modifier = Modifier.padding(top = 4.dp),
+                    ) { Text("Activar notificaciones") }
+                }
+                IconButton(onClick = { dismissed = true }) {
+                    Icon(Icons.Filled.Close, contentDescription = "Cerrar aviso", tint = MaterialTheme.colorScheme.onErrorContainer)
                 }
             }
         }
