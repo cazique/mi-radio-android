@@ -1,0 +1,347 @@
+package com.miradio.app.ui.news
+
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Newspaper
+import androidx.compose.material.icons.filled.OpenInBrowser
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import com.miradio.app.domain.model.NewsArticle
+import com.miradio.app.domain.model.NewsCategory
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.concurrent.TimeUnit
+
+/**
+ * Pestaña de Noticias: RSS público de COPE por secciones, mostrado a lo
+ * grande (foto + titular bien visible, como el feed de noticias del móvil),
+ * sin nada de la publicidad de su web porque solo se lee y se pinta el
+ * contenido del RSS, nunca la página completa.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NewsScreen(
+    onBack: () -> Unit,
+    viewModel: NewsViewModel = viewModel(factory = NewsViewModel.Factory),
+) {
+    val state by viewModel.uiState.collectAsState()
+    var selectedArticle by remember { mutableStateOf<NewsArticle?>(null) }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Noticias COPE") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            BulletinCard(
+                bulletin = state.bulletin,
+                isLoading = state.isBulletinLoading,
+                isPlaying = state.isBulletinPlaying,
+                onPlayClick = viewModel::onBulletinPlayClick,
+                modifier = Modifier.padding(16.dp),
+            )
+
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
+            ) {
+                items(NewsCategory.entries) { category ->
+                    FilterChip(
+                        selected = category == state.category,
+                        onClick = { viewModel.onCategorySelect(category) },
+                        label = { Text(category.label) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primary,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                        ),
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            when {
+                state.isLoading -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+                state.error != null -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = state.error ?: "",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(32.dp),
+                    )
+                }
+                state.articles.isEmpty() -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "No hay noticias en esta categoría ahora mismo.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                else -> LazyColumn(
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp),
+                ) {
+                    items(state.articles, key = { it.link }) { article ->
+                        NewsArticleCard(article = article, onClick = { selectedArticle = article })
+                    }
+                }
+            }
+        }
+    }
+
+    selectedArticle?.let { article ->
+        NewsDetailDialog(article = article, onDismiss = { selectedArticle = null })
+    }
+}
+
+/**
+ * Tarjeta grande y sencilla, con el mismo espíritu que el feed de noticias
+ * del propio teléfono: foto a todo lo ancho y titular grande justo debajo,
+ * sin más botones ni iconos que distraigan (pensado para que cualquiera,
+ * sin experiencia con apps, sepa qué tocar).
+ */
+@Composable
+private fun NewsArticleCard(article: NewsArticle, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        article.imageUrl?.let { url ->
+            AsyncImage(
+                model = url,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 10f),
+            )
+        }
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = article.title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+            val subtitle = listOfNotNull("COPE", formatRelativeTime(article.pubDate)).joinToString(" · ")
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+    }
+}
+
+/** Detalle a pantalla completa: título, foto e íntegro el resumen del RSS,
+ *  con la opción (nunca obligatoria) de abrir la noticia completa en el
+ *  navegador si se quiere leer más de lo que trae el resumen. */
+@Composable
+private fun NewsDetailDialog(article: NewsArticle, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Noticia") },
+                    navigationIcon = {
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        }
+                    },
+                )
+            },
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                article.imageUrl?.let { url ->
+                    AsyncImage(
+                        model = url,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxWidth().aspectRatio(16f / 10f),
+                    )
+                }
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text(text = article.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    val subtitle = listOfNotNull("COPE", formatRelativeTime(article.pubDate)).joinToString(" · ")
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 6.dp, bottom = 16.dp),
+                    )
+                    article.description?.let { description ->
+                        Text(text = description, style = MaterialTheme.typography.bodyLarge)
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(article.link)))
+                        },
+                        modifier = Modifier.padding(top = 24.dp),
+                    ) {
+                        Icon(Icons.Filled.OpenInBrowser, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+                        Text("Leer completa en cope.es")
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Tarjeta del último boletín informativo en audio: un solo botón grande de
+ *  reproducir/pausar, reutilizando el mismo reproductor (y su notificación)
+ *  que las emisoras de radio. */
+@Composable
+private fun BulletinCard(
+    bulletin: NewsArticle?,
+    isLoading: Boolean,
+    isPlaying: Boolean,
+    onPlayClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier.size(40.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.Newspaper,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(28.dp),
+                )
+            }
+            Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                Text(
+                    text = "Último boletín informativo",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+                Text(
+                    text = when {
+                        isLoading -> "Cargando…"
+                        bulletin != null -> bulletin.title
+                        else -> "No disponible ahora mismo"
+                    },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (isLoading) {
+                CircularProgressIndicator(modifier = Modifier.size(32.dp), strokeWidth = 3.dp)
+            } else {
+                FilledIconButton(
+                    onClick = onPlayClick,
+                    enabled = bulletin?.audioUrl != null,
+                    modifier = Modifier.size(56.dp),
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.primary),
+                ) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = if (isPlaying) "Pausar boletín" else "Escuchar boletín",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Los RSS traen la fecha en formato RFC-822 ("Wed, 12 Aug 2026 10:00:00
+ *  +0200"); se convierte a "hace X min/h/d" para que se lea de un vistazo,
+ *  como en cualquier app de noticias. Si no se puede interpretar (formato
+ *  distinto según la sección), simplemente no se muestra nada de fecha en
+ *  vez de enseñar el texto en crudo. */
+private fun formatRelativeTime(pubDate: String?): String? {
+    if (pubDate.isNullOrBlank()) return null
+    val patterns = listOf("EEE, dd MMM yyyy HH:mm:ss Z", "EEE, dd MMM yyyy HH:mm:ss zzz")
+    val parsedMillis = patterns.firstNotNullOfOrNull { pattern ->
+        runCatching { SimpleDateFormat(pattern, Locale.ENGLISH).parse(pubDate)?.time }.getOrNull()
+    } ?: return null
+    val diffMs = (System.currentTimeMillis() - parsedMillis).coerceAtLeast(0)
+    return when {
+        diffMs < TimeUnit.MINUTES.toMillis(1) -> "ahora"
+        diffMs < TimeUnit.HOURS.toMillis(1) -> "hace ${TimeUnit.MILLISECONDS.toMinutes(diffMs)} min"
+        diffMs < TimeUnit.DAYS.toMillis(1) -> "hace ${TimeUnit.MILLISECONDS.toHours(diffMs)} h"
+        else -> "hace ${TimeUnit.MILLISECONDS.toDays(diffMs)} d"
+    }
+}

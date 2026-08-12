@@ -9,6 +9,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.miradio.app.ui.home.HomeLandingScreen
 import com.miradio.app.ui.home.HomeScreen
+import com.miradio.app.ui.news.NewsScreen
 import com.miradio.app.ui.player.PlayerScreen
 import com.miradio.app.ui.settings.SettingsScreen
 import com.miradio.app.ui.stations.StationEditScreen
@@ -17,6 +18,7 @@ object Routes {
     const val HOME = "home"
     const val EXPLORE = "explore"
     const val FAVORITES = "favorites"
+    const val NEWS = "news"
     const val PLAYER = "player"
     const val SETTINGS = "settings"
     const val STATION_ADD = "stations/add"
@@ -54,6 +56,9 @@ fun RadioNavHost(navController: NavHostController = rememberNavController()) {
                 onEditStation = { station -> navController.navigate(Routes.stationEdit(station.id)) },
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) },
             )
+        }
+        composable(Routes.NEWS) {
+            NewsScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.PLAYER) {
             PlayerScreen(onBack = { navController.popBackStack() })

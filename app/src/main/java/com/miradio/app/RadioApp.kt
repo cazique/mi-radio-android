@@ -3,6 +3,7 @@ package com.miradio.app
 import android.app.Application
 import com.miradio.app.data.database.AppDatabase
 import com.miradio.app.data.remote.RemoteStationsService
+import com.miradio.app.data.repository.NewsRepository
 import com.miradio.app.data.repository.PreferencesRepository
 import com.miradio.app.data.repository.StationRepository
 import com.miradio.app.domain.usecase.AddStationUseCase
@@ -34,6 +35,7 @@ class AppContainer(app: Application) {
     val refreshRemoteStationsUseCase by lazy {
         RefreshRemoteStationsUseCase(stationRepository, preferencesRepository)
     }
+    val newsRepository by lazy { NewsRepository(app) }
 }
 
 class RadioApp : Application() {
