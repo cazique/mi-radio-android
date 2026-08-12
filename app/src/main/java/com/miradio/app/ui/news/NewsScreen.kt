@@ -49,6 +49,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -222,8 +223,14 @@ private fun NewsDetailDialog(article: NewsArticle, onDismiss: () -> Unit) {
 
     val tts = remember { NewsTts(context) }
     val isSpeaking by tts.isSpeaking.collectAsState()
+    val ttsError by tts.error.collectAsState()
     DisposableEffect(Unit) {
         onDispose { tts.shutdown() }
+    }
+    LaunchedEffect(ttsError) {
+        ttsError?.let { message ->
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
     }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -294,13 +301,7 @@ private fun NewsDetailDialog(article: NewsArticle, onDismiss: () -> Unit) {
                                 tts.stop()
                             } else {
                                 val textToRead = listOfNotNull(article.title, article.description).joinToString(". ")
-                                if (!tts.speak(textToRead)) {
-                                    Toast.makeText(
-                                        context,
-                                        "No se ha podido leer la noticia: el teléfono no tiene un motor de voz listo.",
-                                        Toast.LENGTH_LONG,
-                                    ).show()
-                                }
+                                tts.speak(textToRead)
                             }
                         },
                         modifier = Modifier.padding(top = 8.dp, bottom = 16.dp),
