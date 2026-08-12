@@ -2,6 +2,7 @@ package com.miradio.app.ui.news
 
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,8 +27,11 @@ import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.TextDecrease
 import androidx.compose.material.icons.filled.TextIncrease
+import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -44,6 +48,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,6 +68,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.miradio.app.domain.model.NewsArticle
 import com.miradio.app.domain.model.NewsCategory
+import com.miradio.app.util.NewsTts
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -214,6 +220,12 @@ private fun NewsDetailDialog(article: NewsArticle, onDismiss: () -> Unit) {
     // tocar nada. Con los botones A-/A+ se puede ajustar entre 0.85x y 1.85x.
     var textScale by remember { mutableStateOf(1.15f) }
 
+    val tts = remember { NewsTts(context) }
+    val isSpeaking by tts.isSpeaking.collectAsState()
+    DisposableEffect(Unit) {
+        onDispose { tts.shutdown() }
+    }
+
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Scaffold(
             topBar = {
@@ -274,8 +286,32 @@ private fun NewsDetailDialog(article: NewsArticle, onDismiss: () -> Unit) {
                         text = subtitle,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 6.dp, bottom = 16.dp),
+                        modifier = Modifier.padding(top = 6.dp, bottom = 4.dp),
                     )
+                    Button(
+                        onClick = {
+                            if (isSpeaking) {
+                                tts.stop()
+                            } else {
+                                val textToRead = listOfNotNull(article.title, article.description).joinToString(". ")
+                                if (!tts.speak(textToRead)) {
+                                    Toast.makeText(
+                                        context,
+                                        "No se ha podido leer la noticia: el teléfono no tiene un motor de voz listo.",
+                                        Toast.LENGTH_LONG,
+                                    ).show()
+                                }
+                            }
+                        },
+                        modifier = Modifier.padding(top = 8.dp, bottom = 16.dp),
+                    ) {
+                        Icon(
+                            imageVector = if (isSpeaking) Icons.Filled.Stop else Icons.Filled.VolumeUp,
+                            contentDescription = null,
+                            modifier = Modifier.padding(end = 8.dp),
+                        )
+                        Text(if (isSpeaking) "Detener lectura" else "Escuchar noticia")
+                    }
                     article.description?.let { description ->
                         Text(
                             text = description,
