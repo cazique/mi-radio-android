@@ -35,6 +35,9 @@ jobs:
       - name: Dar permisos de ejecución a gradlew
         run: chmod +x gradlew
 
+      - name: Ejecutar tests
+        run: ./gradlew testDebugUnitTest --no-daemon
+
       - name: Compilar APK de depuración (instalable directamente)
         run: ./gradlew assembleDebug --no-daemon
 

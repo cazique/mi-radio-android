@@ -174,6 +174,17 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+    // MockWebServer sirve respuestas HTTP falsas y controladas, sin mockear
+    // OkHttpClient a mano: permite probar RemoteStationsService y
+    // ValidateStreamUrlUseCase (que son clases finales) con peticiones reales
+    // contra un servidor local, en vez de necesitar una librería de mocking.
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    // Solo para poder pasar un android.content.Context inerte a
+    // StationRepository en las pruebas (StationRepositorySyncTest no llama a
+    // ensureSeeded(), el único sitio donde lo usa de verdad); el jar de
+    // Android para pruebas unitarias no permite construir Context a mano.
+    testImplementation("org.mockito:mockito-core:5.14.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
 }

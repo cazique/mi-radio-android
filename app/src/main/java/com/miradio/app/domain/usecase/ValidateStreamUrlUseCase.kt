@@ -51,8 +51,17 @@ class ValidateStreamUrlUseCase(
                 // se puede seguir cerrando normalmente al salir de use{}, sin
                 // haber descargado el stream (que, al ser radio en directo, no
                 // tiene fin) más allá de estos pocos bytes.
+                //
+                // OJO: request() en vez de readByteArray(n). readByteArray(n)
+                // exige exactamente n bytes y lanza EOFException si el cuerpo
+                // es más corto (p. ej. una respuesta de error de 6 bytes),
+                // perdiendo los bytes que sí habían llegado. request(n) no
+                // lanza: deja en el buffer lo que haya podido leer, aunque
+                // sea menos de n.
                 val firstBytes = runCatching {
-                    body.source().peek().readByteArray(MAGIC_BYTES_TO_CHECK.toLong())
+                    val peeked = body.source().peek()
+                    peeked.request(MAGIC_BYTES_TO_CHECK.toLong())
+                    peeked.buffer.readByteArray()
                 }.getOrDefault(ByteArray(0))
 
                 if (looksLikeAudio(contentType, firstBytes)) {
