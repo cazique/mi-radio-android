@@ -159,20 +159,39 @@ class RadioPlayer(
         activePlayer.playWhenReady = true
     }
 
+    private var pendingSwitchJob: Job? = null
+
     init {
         localPlayer.addListener(playerListener)
         castPlayer?.addListener(playerListener)
         castPlayer?.setSessionAvailabilityListener(object : SessionAvailabilityListener {
             override fun onCastSessionAvailable() {
-                switchTo(castPlayer, OutputDevice.CAST, castContext?.sessionManager?.currentCastSession?.castDevice?.friendlyName)
+                scheduleSwitch(castPlayer, OutputDevice.CAST, castContext?.sessionManager?.currentCastSession?.castDevice?.friendlyName)
             }
 
             override fun onCastSessionUnavailable() {
-                switchTo(localPlayer, OutputDevice.PHONE, null)
+                scheduleSwitch(localPlayer, OutputDevice.PHONE, null)
             }
         })
         runCatching { connectivityManager?.registerDefaultNetworkCallback(networkCallback) }
             .onFailure { Log.w(TAG, "No se pudo registrar el callback de conectividad: ${it.message}") }
+    }
+
+    /**
+     * Con un altavoz Cast en un grupo/red inestable, la sesión puede
+     * conectarse y desconectarse varias veces seguidas en segundos (visto en
+     * campo: hasta 6 veces en 2 minutos). Sin este pequeño retardo, cada
+     * bandazo reiniciaba la reproducción entera (con su rebuffering) tanto en
+     * el móvil como en el altavoz. Al esperar un momento y cancelar si llega
+     * otro cambio antes, solo se aplica el estado en el que la sesión se
+     * queda quieta de verdad.
+     */
+    private fun scheduleSwitch(newPlayer: Player, device: OutputDevice, castDeviceName: String?) {
+        pendingSwitchJob?.cancel()
+        pendingSwitchJob = scope.launch {
+            delay(1_200)
+            switchTo(newPlayer, device, castDeviceName)
+        }
     }
 
     private fun switchTo(newPlayer: Player, device: OutputDevice, castDeviceName: String?) {
@@ -409,6 +428,7 @@ class RadioPlayer(
         DiagnosticsLog.log(context, "RadioPlayer", "release()")
         sleepTimerJob?.cancel()
         retryJob?.cancel()
+        pendingSwitchJob?.cancel()
         runCatching { connectivityManager?.unregisterNetworkCallback(networkCallback) }
         localPlayer.removeListener(playerListener)
         castPlayer?.removeListener(playerListener)
