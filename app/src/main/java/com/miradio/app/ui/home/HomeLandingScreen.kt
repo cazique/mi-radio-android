@@ -135,6 +135,7 @@ fun HomeLandingScreen(
                 status = state.player.status,
                 onPlayPauseClick = { viewModel.onPrimaryPlayClick(state) },
                 onCardClick = if (state.displayedStation != null) onOpenPlayer else null,
+                nowPlayingTitle = state.player.nowPlayingTitle,
                 modifier = Modifier
                     .padding(horizontal = 16.dp)
                     .fillMaxWidth(),

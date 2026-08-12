@@ -63,8 +63,10 @@ fun MiniPlayerBar(onClick: () -> Unit, modifier: Modifier = Modifier) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                // La canción (metadatos ICY) es más relevante que la ciudad
+                // cuando la emisora la manda; si no, se sigue viendo la ciudad.
                 Text(
-                    text = station.city,
+                    text = uiState.nowPlayingTitle ?: station.city,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,

@@ -151,6 +151,10 @@ dependencies {
     implementation("androidx.media3:media3-cast:1.4.1")
     implementation("androidx.media3:media3-common:1.4.1")
     implementation("androidx.media3:media3-datasource-okhttp:1.4.1")
+    // Declarado explícito (aunque media3-exoplayer ya lo trae de forma
+    // transitiva) porque RadioPlayer usa directamente IcyInfo de aquí para
+    // leer los metadatos "ahora suena" (título) que mandan Icecast/Shoutcast.
+    implementation("androidx.media3:media3-extractor:1.4.1")
 
     // Google Cast
     implementation("com.google.android.gms:play-services-cast-framework:21.5.0")

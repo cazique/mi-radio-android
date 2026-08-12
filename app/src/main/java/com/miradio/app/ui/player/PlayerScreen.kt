@@ -145,6 +145,19 @@ fun PlayerScreen(
                 modifier = Modifier.padding(top = 4.dp),
             )
 
+            // "Artista - Canción" que manda el propio stream (metadatos ICY),
+            // cuando la emisora los envía; muchas no lo hacen, así que solo
+            // se muestra cuando hay algo que mostrar.
+            state.player.nowPlayingTitle?.let { nowPlaying ->
+                Text(
+                    text = nowPlaying,
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 10.dp),
+                )
+            }
+
             Waveform(
                 isActive = isPlaying,
                 modifier = Modifier.padding(top = 28.dp),

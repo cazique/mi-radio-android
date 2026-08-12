@@ -41,6 +41,7 @@ fun PlayerCard(
     onPlayPauseClick: () -> Unit,
     modifier: Modifier = Modifier,
     onCardClick: (() -> Unit)? = null,
+    nowPlayingTitle: String? = null,
 ) {
     val shape = RoundedCornerShape(28.dp)
     Card(
@@ -76,6 +77,16 @@ fun PlayerCard(
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                // "Artista - Canción" de los metadatos ICY del stream, si la
+                // emisora los envía (muchas no lo hacen).
+                nowPlayingTitle?.let { nowPlaying ->
+                    Text(
+                        text = nowPlaying,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    )
+                }
             }
 
             PlayPauseButton(status = status, enabled = station != null, onClick = onPlayPauseClick)

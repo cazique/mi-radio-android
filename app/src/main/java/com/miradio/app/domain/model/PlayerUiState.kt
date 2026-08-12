@@ -26,4 +26,9 @@ data class PlayerUiState(
     /** Retardo actual (segundos) del directo en el móvil. No se aplica al
      *  reproducir por Cast: el dispositivo Cast usa su propio buffer. */
     val playbackDelaySeconds: Int = 0,
+    /** Título "artista - canción" que manda el propio stream (metadatos ICY
+     *  de Icecast/Shoutcast), si el servidor los envía. Null mientras no ha
+     *  llegado ninguno (muchas emisoras no los mandan) o justo tras cambiar
+     *  de emisora, hasta que llegue el primero de la nueva. */
+    val nowPlayingTitle: String? = null,
 )

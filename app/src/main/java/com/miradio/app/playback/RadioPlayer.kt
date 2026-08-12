@@ -10,11 +10,13 @@ import androidx.media3.cast.CastPlayer
 import androidx.media3.cast.SessionAvailabilityListener
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.Metadata
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.extractor.metadata.icy.IcyInfo
 import com.google.android.gms.cast.framework.CastContext
 import com.miradio.app.data.repository.PreferencesRepository
 import com.miradio.app.domain.model.OutputDevice
@@ -102,6 +104,25 @@ class RadioPlayer(
             val playbackError = mapExoError(error)
             _uiState.update { it.copy(status = PlaybackStatus.ERROR, errorMessage = playbackError.messageKey) }
             scheduleRetry()
+        }
+
+        /**
+         * Icecast/Shoutcast intercalan metadatos (título "Artista - Canción")
+         * dentro del propio stream de audio; Media3 los extrae solo y los
+         * entrega aquí como IcyInfo. No todas las emisoras los mandan: cuando
+         * no llegan, nowPlayingTitle simplemente se queda en null.
+         */
+        override fun onMetadata(metadata: Metadata) {
+            for (i in 0 until metadata.length()) {
+                val entry = metadata.get(i)
+                if (entry is IcyInfo) {
+                    val title = entry.title?.trim()?.takeIf { it.isNotBlank() }
+                    if (title != null) {
+                        DiagnosticsLog.log(context, "RadioPlayer", "ICY: \"$title\"")
+                        _uiState.update { it.copy(nowPlayingTitle = title) }
+                    }
+                }
+            }
         }
     }
 
@@ -269,7 +290,12 @@ class RadioPlayer(
         retryJob?.cancel()
         retryAttempt = 0
         currentStation = station
-        _uiState.update { it.copy(station = station, status = PlaybackStatus.BUFFERING, errorMessage = null) }
+        // Se limpia aquí: si no, al cambiar de emisora se seguía viendo la
+        // canción de la anterior (o de ninguna) hasta que llegara el primer
+        // metadato ICY de la nueva, que puede tardar según el servidor.
+        _uiState.update {
+            it.copy(station = station, status = PlaybackStatus.BUFFERING, errorMessage = null, nowPlayingTitle = null)
+        }
         activePlayer.setMediaItem(buildMediaItem(station))
         activePlayer.prepare()
         activePlayer.playWhenReady = true
