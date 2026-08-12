@@ -6,8 +6,10 @@ import androidx.core.content.FileProvider
 import androidx.core.content.pm.PackageInfoCompat
 import com.miradio.app.BuildConfig
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.Request
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -34,42 +36,60 @@ object AppUpdater {
     private const val APK_URL =
         "https://github.com/cazique/mi-radio-android/releases/download/latest-debug/app-debug.apk"
 
+    // Forzar HTTP/1.1: el CDN de descargas de GitHub a veces corta a media
+    // petición con "stream was reset: REFUSED_STREAM" (visto varias veces
+    // en registros reales), un fallo propio del multiplexado de HTTP/2. Con
+    // HTTP/1.1 cada descarga va por su propia conexión y ese fallo concreto
+    // desaparece.
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .protocols(listOf(Protocol.HTTP_1_1))
+        .build()
+
     suspend fun checkForUpdate(context: Context): UpdateCheckResult = withContext(Dispatchers.IO) {
         DiagnosticsLog.log(context, "AppUpdater", "checkForUpdate()")
-        val client = OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .build()
-        try {
-            val request = Request.Builder().url(APK_URL).get().build()
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    return@withContext UpdateCheckResult.Failure("HTTP ${response.code}")
-                }
-                val body = response.body ?: return@withContext UpdateCheckResult.Failure("Respuesta vacía")
-                val dir = File(context.cacheDir, "updates").apply { mkdirs() }
-                val file = File(dir, "mi-radio-update.apk")
-                body.byteStream().use { input -> file.outputStream().use { output -> input.copyTo(output) } }
-
-                val info = context.packageManager.getPackageArchiveInfo(file.absolutePath, 0)
-                    ?: return@withContext UpdateCheckResult.Failure("No se ha podido leer el APK descargado")
-                val downloadedVersionCode = PackageInfoCompat.getLongVersionCode(info)
-                val currentVersionCode = BuildConfig.VERSION_CODE.toLong()
-                DiagnosticsLog.log(
-                    context,
-                    "AppUpdater",
-                    "Descargado ${info.versionName} ($downloadedVersionCode), instalado ${BuildConfig.VERSION_NAME} ($currentVersionCode)",
-                )
-                if (downloadedVersionCode > currentVersionCode) {
-                    UpdateCheckResult.UpdateAvailable(file, info.versionName, downloadedVersionCode)
-                } else {
-                    file.delete()
-                    UpdateCheckResult.UpToDate
-                }
+        var lastError: Exception? = null
+        // Hasta 3 intentos: un corte de conexión puntual no debería obligar
+        // al usuario a darle varias veces a mano a "Buscar actualizaciones".
+        repeat(3) { attempt ->
+            try {
+                return@withContext downloadAndCompare(context)
+            } catch (e: Exception) {
+                lastError = e
+                DiagnosticsLog.logThrowable(context, "AppUpdater", "checkForUpdate falló (intento ${attempt + 1}/3)", e)
+                if (attempt < 2) delay(1_000L * (attempt + 1))
             }
-        } catch (e: Exception) {
-            DiagnosticsLog.logThrowable(context, "AppUpdater", "checkForUpdate falló", e)
-            UpdateCheckResult.Failure(e.message ?: "Error de conexión")
+        }
+        UpdateCheckResult.Failure(lastError?.message ?: "Error de conexión")
+    }
+
+    private fun downloadAndCompare(context: Context): UpdateCheckResult {
+        val request = Request.Builder().url(APK_URL).get().build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                return UpdateCheckResult.Failure("HTTP ${response.code}")
+            }
+            val body = response.body ?: return UpdateCheckResult.Failure("Respuesta vacía")
+            val dir = File(context.cacheDir, "updates").apply { mkdirs() }
+            val file = File(dir, "mi-radio-update.apk")
+            body.byteStream().use { input -> file.outputStream().use { output -> input.copyTo(output) } }
+
+            val info = context.packageManager.getPackageArchiveInfo(file.absolutePath, 0)
+                ?: return UpdateCheckResult.Failure("No se ha podido leer el APK descargado")
+            val downloadedVersionCode = PackageInfoCompat.getLongVersionCode(info)
+            val currentVersionCode = BuildConfig.VERSION_CODE.toLong()
+            DiagnosticsLog.log(
+                context,
+                "AppUpdater",
+                "Descargado ${info.versionName} ($downloadedVersionCode), instalado ${BuildConfig.VERSION_NAME} ($currentVersionCode)",
+            )
+            return if (downloadedVersionCode > currentVersionCode) {
+                UpdateCheckResult.UpdateAvailable(file, info.versionName, downloadedVersionCode)
+            } else {
+                file.delete()
+                UpdateCheckResult.UpToDate
+            }
         }
     }
 
