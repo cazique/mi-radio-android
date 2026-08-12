@@ -1,6 +1,7 @@
 package com.miradio.app.ui.settings
 
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -484,9 +485,14 @@ private fun DiagnosticsSection() {
 
             OutlinedButton(
                 onClick = {
-                    context.startActivity(
-                        Intent.createChooser(DiagnosticsLog.shareIntent(context), "Compartir registro"),
-                    )
+                    runCatching {
+                        context.startActivity(
+                            Intent.createChooser(DiagnosticsLog.shareIntent(context), "Compartir registro"),
+                        )
+                    }.onFailure {
+                        DiagnosticsLog.logThrowable(context, "SettingsScreen", "Fallo al compartir el registro", it)
+                        Toast.makeText(context, "No se ha podido compartir el registro", Toast.LENGTH_SHORT).show()
+                    }
                 },
             ) { Text("Compartir registro") }
         }

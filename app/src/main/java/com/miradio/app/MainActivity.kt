@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
@@ -106,21 +107,23 @@ class MainActivity : FragmentActivity() {
 
         val container = (application as RadioApp).container
         lifecycleScope.launch {
-            PlaybackController.ensureServiceStarted(this@MainActivity)
-            val player = PlaybackController.awaitPlayer()
-            if (player.uiState.value.station != null) {
-                player.play()
-                return@launch
-            }
-            val lastId = container.preferencesRepository.lastStationId.first()
-            val stations = container.stationRepository.stations.first()
-            val station = stations.find { it.id == lastId }
-                ?: stations.firstOrNull { it.isFavorite }
-                ?: stations.firstOrNull()
-            station?.let {
-                player.playStation(it)
-                container.preferencesRepository.setLastStation(it.id)
-            }
+            runCatching {
+                PlaybackController.ensureServiceStarted(this@MainActivity)
+                val player = PlaybackController.awaitPlayer()
+                if (player.uiState.value.station != null) {
+                    player.play()
+                    return@runCatching
+                }
+                val lastId = container.preferencesRepository.lastStationId.first()
+                val stations = container.stationRepository.stations.first()
+                val station = stations.find { it.id == lastId }
+                    ?: stations.firstOrNull { it.isFavorite }
+                    ?: stations.firstOrNull()
+                station?.let {
+                    player.playStation(it)
+                    container.preferencesRepository.setLastStation(it.id)
+                }
+            }.onFailure { DiagnosticsLog.logThrowable(this@MainActivity, "MainActivity", "Fallo en el enlace directo de reproducir", it) }
         }
     }
 }
@@ -149,9 +152,14 @@ private fun CrashReportPrompt() {
             confirmButton = {
                 Button(onClick = {
                     showPrompt = false
-                    context.startActivity(
-                        Intent.createChooser(DiagnosticsLog.shareIntent(context), "Compartir registro"),
-                    )
+                    runCatching {
+                        context.startActivity(
+                            Intent.createChooser(DiagnosticsLog.shareIntent(context), "Compartir registro"),
+                        )
+                    }.onFailure {
+                        DiagnosticsLog.logThrowable(context, "MainActivity", "Fallo al compartir el registro tras un cierre", it)
+                        Toast.makeText(context, "No se ha podido compartir el registro", Toast.LENGTH_SHORT).show()
+                    }
                 }) { Text("Compartir") }
             },
             dismissButton = {

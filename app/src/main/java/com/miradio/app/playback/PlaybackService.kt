@@ -192,52 +192,65 @@ class PlaybackService : MediaSessionService() {
         // de la emisora en reproducción.
         startForegroundImmediately()
 
-        val castContext = try {
-            CastContext.getSharedInstance(this)
+        // Si algo de lo siguiente falla, la notificación provisional de
+        // arriba se quedaría pegada para siempre (sin emisora, sin
+        // controles: el fallo reportado por usuarios). Mejor dejar
+        // constancia del motivo exacto en el registro y parar el servicio
+        // con orden que quedarse a medio montar de forma silenciosa.
+        try {
+            val castContext = try {
+                CastContext.getSharedInstance(this)
+            } catch (e: Exception) {
+                // Dispositivos sin Google Play Services (algunos emuladores, Android TV
+                // sin GMS, etc.) no deben impedir que la radio suene localmente.
+                Log.w(TAG, "No se pudo inicializar CastContext: ${e.message}")
+                null
+            }
+
+            radioPlayer = RadioPlayer(this, castContext, preferencesRepository)
+            radioPlayer.onActivePlayerChanged = { newPlayer -> mediaSession.player = newPlayer }
+
+            mediaSession = MediaSession.Builder(this, radioPlayer.activePlayer)
+                .setId("MiRadioSession")
+                .setCallback(sessionCallback)
+                .build()
+
+            // A partir de aquí, Media3 gestiona la notificación real (portada,
+            // controles) reutilizando el mismo canal e id que la provisional.
+            setMediaNotificationProvider(
+                DefaultMediaNotificationProvider.Builder(this)
+                    .setChannelId(CHANNEL_ID)
+                    .setChannelName(R.string.playback_channel_name)
+                    .setNotificationId(NOTIFICATION_ID)
+                    .build(),
+            )
+
+            PlaybackServiceConnector.attach(radioPlayer)
+
+            serviceScope.launch {
+                // distinctUntilChanged: uiState cambia por muchos motivos que no
+                // afectan al widget (canción "ahora suena" vía ICY, temporizador
+                // de apagado contando segundo a segundo, retardo del directo...).
+                // Sin esto, se repintaba el widget en cada uno de esos cambios,
+                // muchas veces por minuto sin necesidad.
+                radioPlayer.uiState
+                    .map { it.station?.name to it.status }
+                    .distinctUntilChanged()
+                    .collect { (stationName, status) ->
+                        runCatching { RadioWidgetProvider.updateAll(this@PlaybackService, stationName, status) }
+                            .onFailure { DiagnosticsLog.logThrowable(this@PlaybackService, "PlaybackService", "Fallo actualizando el widget", it) }
+                    }
+            }
+
+            serviceScope.launch {
+                val storedDelay = runCatching { preferencesRepository.playbackDelaySeconds.first() }
+                    .onFailure { DiagnosticsLog.logThrowable(this@PlaybackService, "PlaybackService", "Fallo leyendo el retardo guardado", it) }
+                    .getOrDefault(0)
+                if (storedDelay > 0) radioPlayer.setPlaybackDelaySeconds(storedDelay)
+            }
         } catch (e: Exception) {
-            // Dispositivos sin Google Play Services (algunos emuladores, Android TV
-            // sin GMS, etc.) no deben impedir que la radio suene localmente.
-            Log.w(TAG, "No se pudo inicializar CastContext: ${e.message}")
-            null
-        }
-
-        radioPlayer = RadioPlayer(this, castContext, preferencesRepository)
-        radioPlayer.onActivePlayerChanged = { newPlayer -> mediaSession.player = newPlayer }
-
-        mediaSession = MediaSession.Builder(this, radioPlayer.activePlayer)
-            .setId("MiRadioSession")
-            .setCallback(sessionCallback)
-            .build()
-
-        // A partir de aquí, Media3 gestiona la notificación real (portada,
-        // controles) reutilizando el mismo canal e id que la provisional.
-        setMediaNotificationProvider(
-            DefaultMediaNotificationProvider.Builder(this)
-                .setChannelId(CHANNEL_ID)
-                .setChannelName(R.string.playback_channel_name)
-                .setNotificationId(NOTIFICATION_ID)
-                .build(),
-        )
-
-        PlaybackServiceConnector.attach(radioPlayer)
-
-        serviceScope.launch {
-            // distinctUntilChanged: uiState cambia por muchos motivos que no
-            // afectan al widget (canción "ahora suena" vía ICY, temporizador
-            // de apagado contando segundo a segundo, retardo del directo...).
-            // Sin esto, se repintaba el widget en cada uno de esos cambios,
-            // muchas veces por minuto sin necesidad.
-            radioPlayer.uiState
-                .map { it.station?.name to it.status }
-                .distinctUntilChanged()
-                .collect { (stationName, status) ->
-                    RadioWidgetProvider.updateAll(this@PlaybackService, stationName, status)
-                }
-        }
-
-        serviceScope.launch {
-            val storedDelay = preferencesRepository.playbackDelaySeconds.first()
-            if (storedDelay > 0) radioPlayer.setPlaybackDelaySeconds(storedDelay)
+            DiagnosticsLog.logThrowable(this, "PlaybackService", "Fallo inicializando el servicio de reproducción", e)
+            stopSelf()
         }
     }
 
