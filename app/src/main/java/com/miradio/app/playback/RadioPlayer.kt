@@ -8,6 +8,8 @@ import android.util.Log
 import androidx.core.content.getSystemService
 import androidx.media3.cast.CastPlayer
 import androidx.media3.cast.SessionAvailabilityListener
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Metadata
@@ -250,8 +252,19 @@ class RadioPlayer(
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(minBufferMs, maxBufferMs, bufferForPlaybackMs, bufferForPlaybackMs)
             .build()
+        // Sin esto, ExoPlayer no pide el foco de audio al sistema y la radio
+        // sigue sonando por encima de cualquier otra cosa: una nota de voz
+        // de WhatsApp, un audio de otra app, una llamada entrante... Con
+        // handleAudioFocus=true, Android avisa automáticamente y ExoPlayer
+        // se pausa solo mientras dura el otro sonido (y se reanuda solo al
+        // terminar, si el corte fue temporal).
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(C.USAGE_MEDIA)
+            .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+            .build()
         return ExoPlayer.Builder(context)
             .setLoadControl(loadControl)
+            .setAudioAttributes(audioAttributes, /* handleAudioFocus= */ true)
             .build()
     }
 
