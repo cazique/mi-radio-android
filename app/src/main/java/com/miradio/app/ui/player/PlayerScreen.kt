@@ -1,5 +1,8 @@
 package com.miradio.app.ui.player
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,6 +39,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,7 +48,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -57,6 +65,7 @@ import com.miradio.app.ui.components.PlayPauseButton
 import com.miradio.app.ui.components.SleepTimerDialog
 import com.miradio.app.ui.components.StationLogo
 import com.miradio.app.ui.components.Waveform
+import com.miradio.app.util.extractDominantColor
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,9 +78,41 @@ fun PlayerScreen(
     var showDelayDialog by remember { mutableStateOf(false) }
     val station = state.player.station
     val isPlaying = state.player.status == PlaybackStatus.PLAYING
+    val haptic = LocalHapticFeedback.current
+
+    // Color dominante del logo de la emisora, extraído con la Palette API,
+    // para un fondo degradado estilo Spotify en vez del morado fijo de
+    // antes. Sin logo (o si la extracción falla) se usa el primary del
+    // tema actual, que ya cambia solo con Material You si está activado.
+    val context = LocalContext.current
+    val fallbackColor = MaterialTheme.colorScheme.primary
+    var dominantColor by remember { mutableStateOf(fallbackColor) }
+    LaunchedEffect(station?.logoUrl, fallbackColor) {
+        dominantColor = extractDominantColor(context, station?.logoUrl, fallbackColor)
+    }
+    val animatedColor by animateColorAsState(
+        targetValue = dominantColor,
+        animationSpec = tween(durationMillis = 700),
+        label = "playerBackground",
+    )
+    // Mismo tono que el fondo oscuro de siempre, para no perder el
+    // contraste con los textos blancos de esta pantalla al fundir hacia
+    // abajo el degradado.
+    val gradientEnd = Color(0xFF0E0E14)
+    val backgroundBrush = Brush.verticalGradient(
+        colors = listOf(
+            Color(
+                red = animatedColor.red * 0.55f,
+                green = animatedColor.green * 0.55f,
+                blue = animatedColor.blue * 0.55f,
+            ),
+            gradientEnd,
+        ),
+    )
 
     Scaffold(
-        containerColor = Color(0xFF0E0E14),
+        modifier = Modifier.background(backgroundBrush),
+        containerColor = Color.Transparent,
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
@@ -177,11 +218,21 @@ fun PlayerScreen(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = { viewModel.onSkipStation(-1) }, enabled = station != null) {
+                IconButton(
+                    onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); viewModel.onSkipStation(-1) },
+                    enabled = station != null,
+                ) {
                     Icon(Icons.Filled.SkipPrevious, contentDescription = stringResource(R.string.cd_previous_station), tint = Color.White, modifier = Modifier.size(36.dp))
                 }
-                PlayPauseButton(status = state.player.status, enabled = station != null, onClick = viewModel::onPlayPauseClick)
-                IconButton(onClick = { viewModel.onSkipStation(1) }, enabled = station != null) {
+                PlayPauseButton(
+                    status = state.player.status,
+                    enabled = station != null,
+                    onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); viewModel.onPlayPauseClick() },
+                )
+                IconButton(
+                    onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); viewModel.onSkipStation(1) },
+                    enabled = station != null,
+                ) {
                     Icon(Icons.Filled.SkipNext, contentDescription = stringResource(R.string.cd_next_station), tint = Color.White, modifier = Modifier.size(36.dp))
                 }
             }
@@ -220,7 +271,10 @@ fun PlayerScreen(
                     .padding(top = 24.dp, bottom = 16.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
-                IconButton(onClick = { viewModel.onFavoriteToggle() }, enabled = station != null) {
+                IconButton(
+                    onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); viewModel.onFavoriteToggle() },
+                    enabled = station != null,
+                ) {
                     Icon(
                         imageVector = if (station?.isFavorite == true) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                         contentDescription = stringResource(R.string.cd_favorite),

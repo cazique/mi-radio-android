@@ -1,5 +1,14 @@
 package com.miradio.app.ui.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,9 +26,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
@@ -42,8 +54,20 @@ fun MiniPlayerBar(onClick: () -> Unit, modifier: Modifier = Modifier) {
     val uiState by (radioPlayer?.uiState ?: emptyState).collectAsState()
     val station = uiState.station ?: return
 
+    // Solo se anima la primera vez que aparece en esta composición (p. ej.
+    // al arrancar la radio desde Inicio): visible arranca en false y pasa a
+    // true en cuanto se monta, por lo que el deslizamiento hacia arriba +
+    // aparición solo se ve una vez, no en cada recomposición mientras suena.
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = slideInVertically(initialOffsetY = { fullHeight -> fullHeight }) + fadeIn(),
+        modifier = modifier,
+    ) {
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surfaceVariant,
         tonalElevation = 3.dp,
     ) {
@@ -75,15 +99,25 @@ fun MiniPlayerBar(onClick: () -> Unit, modifier: Modifier = Modifier) {
             }
             val isActive = uiState.status == PlaybackStatus.PLAYING || uiState.status == PlaybackStatus.BUFFERING
             IconButton(onClick = { if (isActive) radioPlayer?.pause() else radioPlayer?.play() }) {
-                if (uiState.status == PlaybackStatus.BUFFERING) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                } else {
-                    Icon(
-                        imageVector = if (isActive) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = null,
-                    )
+                AnimatedContent(
+                    targetState = uiState.status,
+                    transitionSpec = {
+                        (scaleIn(animationSpec = tween(180), initialScale = 0.7f) + fadeIn(tween(180)))
+                            .togetherWith(scaleOut(animationSpec = tween(140), targetScale = 0.7f) + fadeOut(tween(140)))
+                    },
+                    label = "miniPlayPauseIcon",
+                ) { animatedStatus ->
+                    if (animatedStatus == PlaybackStatus.BUFFERING) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(
+                            imageVector = if (animatedStatus == PlaybackStatus.PLAYING) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = null,
+                        )
+                    }
                 }
             }
         }
+    }
     }
 }

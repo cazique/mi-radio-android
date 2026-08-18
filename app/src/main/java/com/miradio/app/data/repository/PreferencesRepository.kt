@@ -36,6 +36,7 @@ class PreferencesRepository(private val context: Context) {
         val DEBUG_MODE = booleanPreferencesKey("debug_mode")
         val SIMPLE_MODE = booleanPreferencesKey("simple_mode")
         val HIDE_ADD_BUTTON = booleanPreferencesKey("hide_add_button")
+        val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
     }
 
     val lastStationId: Flow<String?> =
@@ -88,6 +89,11 @@ class PreferencesRepository(private val context: Context) {
      *  pero sin la tentación de que alguien toque "añadir" sin querer. */
     val hideAddButton: Flow<Boolean> = context.dataStore.data.map { it[Keys.HIDE_ADD_BUTTON] ?: false }
 
+    /** Colores del sistema (Material You, Android 12+) en vez de la paleta de
+     *  marca. Desactivado por defecto para mantener el azul/naranja/crema
+     *  propios de Radio Dari. */
+    val dynamicColorEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.DYNAMIC_COLOR] ?: false }
+
     suspend fun setLastStation(id: String) {
         context.dataStore.edit { it[Keys.LAST_STATION_ID] = id }
     }
@@ -136,6 +142,10 @@ class PreferencesRepository(private val context: Context) {
 
     suspend fun setHideAddButton(enabled: Boolean) {
         context.dataStore.edit { it[Keys.HIDE_ADD_BUTTON] = enabled }
+    }
+
+    suspend fun setDynamicColorEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.DYNAMIC_COLOR] = enabled }
     }
 
     /** Añade [id] al principio del historial de "últimas escuchadas",

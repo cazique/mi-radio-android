@@ -1,5 +1,12 @@
 package com.miradio.app.ui.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -173,17 +180,26 @@ fun PlayPauseButton(status: PlaybackStatus, enabled: Boolean, onClick: () -> Uni
         modifier = modifier.size(88.dp),
         colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.primary),
     ) {
-        when (status) {
-            PlaybackStatus.BUFFERING -> CircularProgressIndicator(
-                modifier = Modifier.size(40.dp),
-                color = MaterialTheme.colorScheme.onPrimary,
-                strokeWidth = 3.dp,
-            )
-            else -> Icon(
-                imageVector = if (status == PlaybackStatus.PLAYING) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                contentDescription = description,
-                modifier = Modifier.size(44.dp),
-            )
+        AnimatedContent(
+            targetState = status,
+            transitionSpec = {
+                (scaleIn(animationSpec = tween(180), initialScale = 0.7f) + fadeIn(tween(180)))
+                    .togetherWith(scaleOut(animationSpec = tween(140), targetScale = 0.7f) + fadeOut(tween(140)))
+            },
+            label = "playPauseIcon",
+        ) { animatedStatus ->
+            when (animatedStatus) {
+                PlaybackStatus.BUFFERING -> CircularProgressIndicator(
+                    modifier = Modifier.size(40.dp),
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    strokeWidth = 3.dp,
+                )
+                else -> Icon(
+                    imageVector = if (animatedStatus == PlaybackStatus.PLAYING) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = description,
+                    modifier = Modifier.size(44.dp),
+                )
+            }
         }
     }
 }

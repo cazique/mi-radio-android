@@ -75,9 +75,10 @@ class MainActivity : FragmentActivity() {
             // sume con el ajuste de accesibilidad de Android.
             val textScale by container.preferencesRepository.textScale.collectAsState(initial = 1f)
             val simpleMode by container.preferencesRepository.simpleMode.collectAsState(initial = false)
+            val dynamicColor by container.preferencesRepository.dynamicColorEnabled.collectAsState(initial = false)
             val density = LocalDensity.current
 
-            MiRadioTheme(themeMode = themeMode) {
+            MiRadioTheme(themeMode = themeMode, dynamicColor = dynamicColor) {
                 CompositionLocalProvider(
                     LocalDensity provides Density(density.density, fontScale = textScale),
                 ) {

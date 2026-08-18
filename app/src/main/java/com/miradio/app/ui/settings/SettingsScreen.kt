@@ -135,6 +135,9 @@ fun SettingsScreen(
                 SectionHeader(Icons.Filled.Palette, SectionPurple, "Apariencia")
                 ThemeCardPicker(selected = state.themeMode, onSelect = viewModel::onThemeModeChange)
                 TextSizeSection(textScale = state.textScale, onTextScaleChange = viewModel::onTextScaleChange)
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                    DynamicColorSection(enabled = state.dynamicColor, onEnabledChange = viewModel::onDynamicColorChange)
+                }
             }
 
             if (!state.simpleMode) {
@@ -517,6 +520,32 @@ private fun SimpleModeSection(enabled: Boolean, onEnabledChange: (Boolean) -> Un
                     "Reproducir/Pausa enorme. Se ocultan Explorar, Añadir emisora y el catálogo " +
                     "remoto. Ideal para dejar la app lista para alguien que solo quiere poner " +
                     "su emisora sin liarse con el resto.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = enabled, onCheckedChange = onEnabledChange)
+    }
+}
+
+/**
+ * Colores del sistema (Material You, Android 12+): sustituye la paleta de
+ * marca (azul/naranja/crema) por una generada a partir del fondo de
+ * pantalla del usuario. Desactivado por defecto para que la app se vea
+ * siempre igual con su propia identidad; solo se ofrece a quien lo prefiera.
+ */
+@Composable
+private fun DynamicColorSection(enabled: Boolean, onEnabledChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+            Text("Usar colores del sistema (Material You)", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "Colorea la app a partir del fondo de pantalla del móvil en vez de usar " +
+                    "los colores propios de Radio Dari.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

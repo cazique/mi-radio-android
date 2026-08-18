@@ -17,6 +17,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import androidx.compose.ui.platform.LocalContext
 import com.miradio.app.R
 
 @Composable
@@ -40,8 +42,9 @@ fun StationLogo(logoUrl: String?, modifier: Modifier = Modifier, cornerRadius: I
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
+            val context = LocalContext.current
             AsyncImage(
-                model = logoUrl,
+                model = ImageRequest.Builder(context).data(logoUrl).crossfade(true).build(),
                 contentDescription = stringResource(R.string.cd_station_logo),
                 // Fit en vez de Crop: muchos logos de emisora no son
                 // cuadrados (marca + texto debajo), así que recortarlos

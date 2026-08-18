@@ -140,6 +140,10 @@ dependencies {
     // Coil (logos de emisoras)
     implementation("io.coil-kt:coil-compose:2.7.0")
 
+    // Extrae el color dominante del logo de la emisora para el fondo
+    // degradado de la pantalla de reproducción (ver PlayerScreen.kt).
+    implementation("androidx.palette:palette-ktx:1.0.0")
+
     // Theme.MaterialComponents, requerido por androidx.mediarouter.app.MediaRouteButton
     // (botón de Cast) para poder inflarse sin lanzar excepción.
     implementation("com.google.android.material:material:1.12.0")
