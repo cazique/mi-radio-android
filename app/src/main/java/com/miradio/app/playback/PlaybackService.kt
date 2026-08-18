@@ -219,6 +219,19 @@ class PlaybackService : MediaSessionService() {
                 .setCallback(sessionCallback)
                 .build()
 
+            // Imprescindible: sin registrar la sesión aquí, el propio
+            // MediaSessionService nunca se entera de que existe para
+            // gestionarle la notificación (aunque onGetSession() la
+            // devuelva igualmente a los controladores que se conectan). Sin
+            // esta llamada, createNotification() de abajo no se invocaba
+            // nunca -algo confirmado en varios días de registros reales
+            // donde su log de diagnóstico jamás aparecía-, así que la
+            // notificación con controles (portada, pausa, siguiente...)
+            // no llegaba a mostrarse: solo quedaba la provisional genérica
+            // publicada en startForegroundImmediately().
+            addSession(mediaSession)
+            DiagnosticsLog.log(this, "PlaybackService", "addSession() registrada")
+
             // A partir de aquí, Media3 gestiona la notificación real (portada,
             // controles) reutilizando el mismo canal e id que la provisional.
             // Envuelta en OngoingWhilePlayingNotificationProvider para que no
@@ -275,6 +288,7 @@ class PlaybackService : MediaSessionService() {
     private fun handleTogglePlayPause() {
         if (!::radioPlayer.isInitialized) return
         val status = radioPlayer.uiState.value.status
+        DiagnosticsLog.log(this, "PlaybackService", "handleTogglePlayPause() estado=$status")
         if (status == PlaybackStatus.PLAYING || status == PlaybackStatus.BUFFERING) {
             radioPlayer.pause()
         } else {
@@ -284,6 +298,7 @@ class PlaybackService : MediaSessionService() {
 
     private fun handlePreviousStation() {
         if (!::radioPlayer.isInitialized) return
+        DiagnosticsLog.log(this, "PlaybackService", "handlePreviousStation()")
         serviceScope.launch {
             val stations = stationRepository.stations.first()
             if (stations.isEmpty()) return@launch
@@ -296,6 +311,7 @@ class PlaybackService : MediaSessionService() {
 
     private fun handleNextStation() {
         if (!::radioPlayer.isInitialized) return
+        DiagnosticsLog.log(this, "PlaybackService", "handleNextStation()")
         serviceScope.launch {
             val stations = stationRepository.stations.first()
             if (stations.isEmpty()) return@launch
@@ -334,7 +350,10 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession = mediaSession
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession {
+        DiagnosticsLog.log(this, "PlaybackService", "onGetSession(${controllerInfo.packageName})")
+        return mediaSession
+    }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         DiagnosticsLog.log(this, "PlaybackService", "onTaskRemoved")
@@ -358,7 +377,10 @@ class PlaybackService : MediaSessionService() {
         DiagnosticsLog.log(this, "PlaybackService", "onDestroy")
         PlaybackServiceConnector.detach()
         serviceScope.cancel()
-        if (::mediaSession.isInitialized) mediaSession.release()
+        if (::mediaSession.isInitialized) {
+            removeSession(mediaSession)
+            mediaSession.release()
+        }
         if (::radioPlayer.isInitialized) radioPlayer.release()
         super.onDestroy()
     }
