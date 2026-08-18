@@ -13,6 +13,7 @@ import com.miradio.app.domain.usecase.ToggleFavoriteUseCase
 import com.miradio.app.domain.usecase.UpdateStationUseCase
 import com.miradio.app.domain.usecase.ValidateStreamUrlUseCase
 import com.miradio.app.util.DiagnosticsLog
+import com.miradio.app.util.WeatherService
 
 /**
  * Contenedor manual de dependencias. Con el tamaño de esta app no hace
@@ -36,6 +37,7 @@ class AppContainer(app: Application) {
         RefreshRemoteStationsUseCase(stationRepository, preferencesRepository)
     }
     val newsRepository by lazy { NewsRepository(app) }
+    val weatherService by lazy { WeatherService() }
 }
 
 class RadioApp : Application() {

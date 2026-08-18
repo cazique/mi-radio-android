@@ -68,6 +68,7 @@ import com.miradio.app.ui.components.CastButton
 import com.miradio.app.ui.components.PlayerCard
 import com.miradio.app.ui.components.RecentStationChip
 import com.miradio.app.ui.components.StationLogo
+import com.miradio.app.ui.components.WeatherCard
 
 /**
  * Pantalla de Inicio curada: "ahora suena", últimas escuchadas y accesos
@@ -146,6 +147,8 @@ fun HomeLandingScreen(
                     },
                 )
             }
+
+            WeatherCard(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
 
             PlayerCard(
                 station = state.displayedStation,

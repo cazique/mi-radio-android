@@ -16,6 +16,11 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
+    <!-- Tiempo en la ubicación actual (Inicio). Solo aproximada: de sobra
+         para el tiempo, no hace falta la precisión de ACCESS_FINE_LOCATION
+         (ni el permiso extra que eso implicaría pedir). -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
     <!-- Actualizar la app dentro de sí misma (fuera de Play Store, Android
          sigue exigiendo que el usuario confirme la instalación). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
