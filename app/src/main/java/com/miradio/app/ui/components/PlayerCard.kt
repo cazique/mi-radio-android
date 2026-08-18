@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
@@ -191,6 +192,13 @@ fun PlayPauseButton(status: PlaybackStatus, enabled: Boolean, onClick: () -> Uni
     ) {
         AnimatedContent(
             targetState = status,
+            // clipToBounds(): scaleIn/scaleOut son transformaciones puramente
+            // visuales (graphicsLayer) que, sin recortar, pueden pintar fuera
+            // del hueco de 88dp del botón durante la transición (se vio como
+            // un círculo enorme y descolocado en el reproductor de Inicio).
+            // Con el recorte, la animación queda siempre dentro del botón.
+            modifier = Modifier.clipToBounds(),
+            contentAlignment = Alignment.Center,
             transitionSpec = {
                 (scaleIn(animationSpec = tween(180), initialScale = 0.7f) + fadeIn(tween(180)))
                     .togetherWith(scaleOut(animationSpec = tween(140), targetScale = 0.7f) + fadeOut(tween(140)))

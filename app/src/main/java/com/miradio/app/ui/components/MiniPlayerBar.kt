@@ -10,6 +10,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -106,6 +107,11 @@ fun MiniPlayerBar(
             IconButton(onClick = onTogglePlayPause) {
                 AnimatedContent(
                     targetState = uiState.status,
+                    // Ver el comentario equivalente en PlayerCard.PlayPauseButton:
+                    // sin recortar, scaleIn/scaleOut pueden pintar fuera del
+                    // hueco del icono durante la transición.
+                    modifier = Modifier.clipToBounds(),
+                    contentAlignment = Alignment.Center,
                     transitionSpec = {
                         (scaleIn(animationSpec = tween(180), initialScale = 0.7f) + fadeIn(tween(180)))
                             .togetherWith(scaleOut(animationSpec = tween(140), targetScale = 0.7f) + fadeOut(tween(140)))
