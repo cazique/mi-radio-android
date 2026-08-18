@@ -17,6 +17,7 @@ import java.util.Locale
  * prefiere escuchar la noticia en vez de leerla en pantalla.
  */
 class NewsTts(context: Context) {
+    private val appContext = context.applicationContext
     private val mainHandler = Handler(Looper.getMainLooper())
     private val _isSpeaking = MutableStateFlow(false)
     val isSpeaking: StateFlow<Boolean> = _isSpeaking
@@ -37,6 +38,7 @@ class NewsTts(context: Context) {
             mainHandler.post {
                 if (status == TextToSpeech.SUCCESS) {
                     ready = true
+                    DiagnosticsLog.log(appContext, "NewsTts", "Motor de voz inicializado correctamente")
                     engine?.language = Locale("es", "ES")
                     engine?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                         override fun onStart(utteranceId: String?) = Unit
@@ -45,6 +47,7 @@ class NewsTts(context: Context) {
                         }
                         @Deprecated("Deprecated in Java", ReplaceWith(""))
                         override fun onError(utteranceId: String?) {
+                            DiagnosticsLog.logWarning(appContext, "NewsTts", "onError durante la lectura (utteranceId=$utteranceId)")
                             mainHandler.post { _isSpeaking.value = false }
                         }
                     })
@@ -53,6 +56,7 @@ class NewsTts(context: Context) {
                         speakNow(text)
                     }
                 } else {
+                    DiagnosticsLog.logWarning(appContext, "NewsTts", "Inicialización del motor de voz falló (status=$status)")
                     _error.value = "El teléfono no tiene ningún motor de voz instalado."
                     _isSpeaking.value = false
                     pendingText = null
@@ -77,6 +81,7 @@ class NewsTts(context: Context) {
     }
 
     fun stop() {
+        DiagnosticsLog.log(appContext, "NewsTts", "stop()")
         pendingText = null
         engine?.stop()
         _isSpeaking.value = false

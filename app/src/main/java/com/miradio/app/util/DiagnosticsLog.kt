@@ -17,6 +17,10 @@ import java.util.Locale
  * conectar el móvil a un ordenador con adb: en Ajustes > Diagnóstico se
  * puede copiar el contenido para pegarlo donde haga falta.
  */
+/** Nivel de severidad de una línea del registro, para poder distinguir de
+ *  un vistazo un aviso sin importancia de un fallo real al leer el log. */
+enum class LogLevel { INFO, WARN, ERROR }
+
 object DiagnosticsLog {
     private const val FILE_NAME = "miradio_diagnostico.log"
     private const val MAX_BYTES = 200 * 1024
@@ -26,19 +30,26 @@ object DiagnosticsLog {
     private fun logFile(context: Context): File = File(context.filesDir, FILE_NAME)
 
     @Synchronized
-    fun log(context: Context, tag: String, message: String) {
+    fun log(context: Context, tag: String, message: String, level: LogLevel = LogLevel.INFO) {
         runCatching {
-            val line = "${dateFormat.format(System.currentTimeMillis())} [$tag] $message\n"
+            val line = "${dateFormat.format(System.currentTimeMillis())} $level [$tag] $message\n"
             logFile(context).appendText(line)
             trimIfNeeded(context)
         }
+    }
+
+    /** Para algo que no ha roto nada pero conviene saber que ha pasado
+     *  (p. ej. un reintento, un valor inesperado que se ha podido corregir
+     *  solo). No confundir con [logThrowable], que es para fallos reales. */
+    fun logWarning(context: Context, tag: String, message: String) {
+        log(context, tag, message, LogLevel.WARN)
     }
 
     @Synchronized
     fun logThrowable(context: Context, tag: String, message: String, error: Throwable) {
         val sw = StringWriter()
         error.printStackTrace(PrintWriter(sw))
-        log(context, tag, "$message: ${error.message}\n$sw")
+        log(context, tag, "$message: ${error.message}\n$sw", LogLevel.ERROR)
     }
 
     /** Instala un manejador que registra cualquier excepción no capturada

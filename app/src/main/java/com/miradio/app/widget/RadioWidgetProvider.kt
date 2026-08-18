@@ -11,6 +11,7 @@ import com.miradio.app.MainActivity
 import com.miradio.app.R
 import com.miradio.app.domain.model.PlaybackStatus
 import com.miradio.app.playback.PlaybackService
+import com.miradio.app.util.DiagnosticsLog
 
 /**
  * Widget de pantalla de inicio: nombre de la emisora actual, play/pause y
@@ -21,6 +22,7 @@ import com.miradio.app.playback.PlaybackService
 class RadioWidgetProvider : AppWidgetProvider() {
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        DiagnosticsLog.log(context, "RadioWidgetProvider", "onUpdate(${appWidgetIds.size} widgets)")
         appWidgetIds.forEach { id ->
             appWidgetManager.updateAppWidget(id, buildRemoteViews(context, null, PlaybackStatus.STOPPED))
         }
@@ -30,6 +32,8 @@ class RadioWidgetProvider : AppWidgetProvider() {
         fun updateAll(context: Context, stationName: String?, status: PlaybackStatus) {
             val manager = AppWidgetManager.getInstance(context)
             val ids = manager.getAppWidgetIds(ComponentName(context, RadioWidgetProvider::class.java))
+            if (ids.isEmpty()) return
+            DiagnosticsLog.log(context, "RadioWidgetProvider", "updateAll(\"$stationName\", $status)")
             val views = buildRemoteViews(context, stationName, status)
             ids.forEach { id -> manager.updateAppWidget(id, views) }
         }

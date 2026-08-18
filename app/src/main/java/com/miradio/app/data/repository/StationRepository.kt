@@ -10,6 +10,7 @@ import com.miradio.app.data.remote.StationCatalogDto
 import com.miradio.app.data.remote.toDomain
 import com.miradio.app.domain.model.RadioStation
 import com.miradio.app.domain.model.StationSource
+import com.miradio.app.util.DiagnosticsLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -38,26 +39,35 @@ class StationRepository(
 
     suspend fun ensureSeeded() = withContext(Dispatchers.IO) {
         if (dao.count() > 0) return@withContext
-        val json = context.assets.open("stations_seed.json").bufferedReader().use { it.readText() }
-        val catalog = this@StationRepository.json.decodeFromString(StationCatalogDto.serializer(), json)
-        val entities = catalog.stations.mapIndexed { index, dto ->
-            dto.toDomain(StationSource.SEED, index).toEntity()
+        try {
+            val json = context.assets.open("stations_seed.json").bufferedReader().use { it.readText() }
+            val catalog = this@StationRepository.json.decodeFromString(StationCatalogDto.serializer(), json)
+            val entities = catalog.stations.mapIndexed { index, dto ->
+                dto.toDomain(StationSource.SEED, index).toEntity()
+            }
+            dao.upsertAll(entities)
+            DiagnosticsLog.log(context, "StationRepository", "ensureSeeded(): ${entities.size} emisoras de fábrica cargadas")
+        } catch (e: Exception) {
+            DiagnosticsLog.logThrowable(context, "StationRepository", "ensureSeeded() falló al leer el catálogo de fábrica", e)
+            throw e
         }
-        dao.upsertAll(entities)
     }
 
     suspend fun getById(id: String): RadioStation? = dao.getById(id)?.toDomain()
 
     suspend fun addStation(station: RadioStation) = withContext(Dispatchers.IO) {
         dao.upsert(station.toEntity())
+        DiagnosticsLog.log(context, "StationRepository", "addStation(${station.id})")
     }
 
     suspend fun updateStation(station: RadioStation) = withContext(Dispatchers.IO) {
         dao.update(station.toEntity())
+        DiagnosticsLog.log(context, "StationRepository", "updateStation(${station.id})")
     }
 
     suspend fun deleteStation(id: String) = withContext(Dispatchers.IO) {
         dao.deleteById(id)
+        DiagnosticsLog.log(context, "StationRepository", "deleteStation($id)")
     }
 
     suspend fun setFavorite(id: String, isFavorite: Boolean) = withContext(Dispatchers.IO) {
@@ -78,13 +88,18 @@ class StationRepository(
      * fuentes siempre tienen prioridad sobre el catálogo remoto.
      */
     suspend fun syncRemoteCatalog(url: String): CatalogSyncResult = withContext(Dispatchers.IO) {
+        DiagnosticsLog.log(context, "StationRepository", "syncRemoteCatalog($url)")
         when (val result = remoteService.fetchCatalog(url)) {
-            is RemoteCatalogResult.Failure -> CatalogSyncResult.Failure(result.reason)
+            is RemoteCatalogResult.Failure -> {
+                DiagnosticsLog.logWarning(context, "StationRepository", "syncRemoteCatalog falló: ${result.reason}")
+                CatalogSyncResult.Failure(result.reason)
+            }
             is RemoteCatalogResult.Success -> {
                 // Un catálogo vacío casi nunca es intencionado (JSON roto, CDN caída,
                 // fichero sustituido por error...) y borraría todo el catálogo remoto
                 // que ya tenías. Se trata como fallo en vez de aplicarlo.
                 if (result.stations.isEmpty()) {
+                    DiagnosticsLog.logWarning(context, "StationRepository", "syncRemoteCatalog: catálogo remoto vacío, se ignora")
                     return@withContext CatalogSyncResult.Failure(
                         "El catálogo remoto está vacío; no se ha aplicado ningún cambio.",
                     )
@@ -97,6 +112,7 @@ class StationRepository(
                         !(it.streamUrl.startsWith("http://") || it.streamUrl.startsWith("https://"))
                 }
                 if (invalidStation != null) {
+                    DiagnosticsLog.logWarning(context, "StationRepository", "syncRemoteCatalog: emisora inválida id=\"${invalidStation.id}\"")
                     return@withContext CatalogSyncResult.Failure(
                         "El catálogo remoto tiene una emisora inválida (id \"${invalidStation.id}\"); no se ha aplicado ningún cambio.",
                     )
@@ -106,6 +122,7 @@ class StationRepository(
                 // sobrescribiera silenciosamente a la otra.
                 val duplicateIds = result.stations.groupBy { it.id }.filterValues { it.size > 1 }.keys
                 if (duplicateIds.isNotEmpty()) {
+                    DiagnosticsLog.logWarning(context, "StationRepository", "syncRemoteCatalog: IDs duplicados (${duplicateIds.take(3).joinToString()})")
                     return@withContext CatalogSyncResult.Failure(
                         "El catálogo remoto tiene IDs duplicados (${duplicateIds.take(3).joinToString()}); no se ha aplicado ningún cambio.",
                     )
@@ -134,6 +151,7 @@ class StationRepository(
                 // mitad, la app se queda con el catálogo anterior completo, nunca
                 // a medias.
                 dao.replaceSource(StationSource.REMOTE.name, entities)
+                DiagnosticsLog.log(context, "StationRepository", "syncRemoteCatalog OK: ${entities.size} emisoras")
                 CatalogSyncResult.Success(entities.size)
             }
         }

@@ -9,6 +9,7 @@ import com.miradio.app.AppContainer
 import com.miradio.app.domain.model.RadioStation
 import com.miradio.app.domain.usecase.UrlValidationResult
 import com.miradio.app.ui.util.radioApp
+import com.miradio.app.util.DiagnosticsLog
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -82,8 +83,11 @@ class StationEditViewModel(
             _state.update { it.copy(urlCheckState = UrlCheckState.CHECKING) }
             when (val result = container.validateStreamUrlUseCase(url)) {
                 UrlValidationResult.Valid -> _state.update { it.copy(urlCheckState = UrlCheckState.OK) }
-                is UrlValidationResult.Unreachable -> _state.update {
-                    it.copy(urlCheckState = UrlCheckState.FAILED, urlCheckMessage = result.reason)
+                is UrlValidationResult.Unreachable -> {
+                    DiagnosticsLog.logWarning(getApplication(), "StationEditViewModel", "checkStreamUrl($url) no accesible: ${result.reason}")
+                    _state.update {
+                        it.copy(urlCheckState = UrlCheckState.FAILED, urlCheckMessage = result.reason)
+                    }
                 }
                 UrlValidationResult.InvalidFormat -> _state.update {
                     it.copy(urlError = true, urlCheckState = UrlCheckState.FAILED)
