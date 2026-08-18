@@ -7,6 +7,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.miradio.app.ui.alarm.AlarmEditScreen
+import com.miradio.app.ui.alarm.AlarmsScreen
 import com.miradio.app.ui.home.HomeLandingScreen
 import com.miradio.app.ui.home.HomeScreen
 import com.miradio.app.ui.news.NewsScreen
@@ -23,8 +25,12 @@ object Routes {
     const val SETTINGS = "settings"
     const val STATION_ADD = "stations/add"
     const val STATION_EDIT = "stations/edit/{stationId}"
+    const val ALARMS = "alarms"
+    const val ALARM_ADD = "alarms/add"
+    const val ALARM_EDIT = "alarms/edit/{alarmId}"
 
     fun stationEdit(id: String) = "stations/edit/$id"
+    fun alarmEdit(id: Long) = "alarms/edit/$id"
 }
 
 @Composable
@@ -64,7 +70,10 @@ fun RadioNavHost(navController: NavHostController = rememberNavController()) {
             PlayerScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.SETTINGS) {
-            SettingsScreen(onBack = { navController.popBackStack() })
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenAlarms = { navController.navigate(Routes.ALARMS) },
+            )
         }
         composable(Routes.STATION_ADD) {
             StationEditScreen(stationId = null, onBack = { navController.popBackStack() })
@@ -75,6 +84,23 @@ fun RadioNavHost(navController: NavHostController = rememberNavController()) {
         ) { backStackEntry ->
             val stationId = backStackEntry.arguments?.getString("stationId")
             StationEditScreen(stationId = stationId, onBack = { navController.popBackStack() })
+        }
+        composable(Routes.ALARMS) {
+            AlarmsScreen(
+                onBack = { navController.popBackStack() },
+                onAddAlarm = { navController.navigate(Routes.ALARM_ADD) },
+                onEditAlarm = { id -> navController.navigate(Routes.alarmEdit(id)) },
+            )
+        }
+        composable(Routes.ALARM_ADD) {
+            AlarmEditScreen(alarmId = null, onBack = { navController.popBackStack() })
+        }
+        composable(
+            route = Routes.ALARM_EDIT,
+            arguments = listOf(navArgument("alarmId") { type = NavType.LongType }),
+        ) { backStackEntry ->
+            val alarmId = backStackEntry.arguments?.getLong("alarmId")
+            AlarmEditScreen(alarmId = alarmId, onBack = { navController.popBackStack() })
         }
     }
 }

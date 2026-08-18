@@ -25,6 +25,13 @@
          sigue exigiendo que el usuario confirme la instalación). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- Alarmas despertador: hora exacta aunque el móvil esté en reposo,
+         reprogramarlas tras reiniciar el móvil, y la pantalla de alarma
+         sonando a pantalla completa (incluso con el móvil bloqueado). -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.software.leanback" android:required="false" />
 
@@ -99,6 +106,31 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/app_widget_info" />
         </receiver>
+
+        <!-- Dispara la alarma programada con AlarmManager -->
+        <receiver
+            android:name=".alarm.AlarmReceiver"
+            android:exported="false" />
+
+        <!-- Vuelve a programar las alarmas activas tras reiniciar el móvil:
+             AlarmManager olvida todo lo programado al apagarse. -->
+        <receiver
+            android:name=".alarm.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Pantalla de alarma sonando, a pantalla completa incluso con el
+             móvil bloqueado (ver el uso de FLAG_SHOW_WHEN_LOCKED/TURN_SCREEN_ON
+             en AlarmRingingActivity y USE_FULL_SCREEN_INTENT arriba). -->
+        <activity
+            android:name=".alarm.AlarmRingingActivity"
+            android:exported="false"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.MiRadio" />
 
         <!-- Permite pasarle al instalador del sistema el APK descargado a
              almacenamiento privado de la app (Android 7+ exige content://). -->

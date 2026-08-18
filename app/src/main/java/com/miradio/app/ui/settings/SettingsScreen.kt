@@ -25,6 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Accessibility
+import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.CheckCircle
@@ -104,6 +105,7 @@ private val SectionGreen = Color(0xFF2E9B5C)
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
+    onOpenAlarms: () -> Unit = {},
     viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -204,6 +206,18 @@ fun SettingsScreen(
                         onMunicipioSelect = viewModel::onAemetMunicipioSelect,
                     )
                 }
+            }
+
+            HorizontalDivider()
+
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SectionHeader(Icons.Filled.Alarm, SectionGreen, "Alarmas")
+                Text(
+                    text = "Despiértate con tu emisora favorita, con volumen creciente si quieres.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedButton(onClick = onOpenAlarms) { Text("Gestionar alarmas") }
             }
 
             HorizontalDivider()
