@@ -27,14 +27,14 @@ class NewsRepository(private val context: Context) {
         .readTimeout(15, TimeUnit.SECONDS)
         .build()
 
-    suspend fun fetchFeed(url: String): Result<List<NewsArticle>> = withContext(Dispatchers.IO) {
+    suspend fun fetchFeed(url: String, sourceId: String? = null): Result<List<NewsArticle>> = withContext(Dispatchers.IO) {
         try {
             val request = Request.Builder().url(url).get().build()
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
                 val body = response.body?.string()
                     ?: return@withContext Result.failure(Exception("Respuesta vacía"))
-                Result.success(parseRss(body))
+                Result.success(parseRss(body, sourceId))
             }
         } catch (e: Exception) {
             DiagnosticsLog.logThrowable(context, "NewsRepository", "fetchFeed($url) falló", e)
@@ -46,7 +46,7 @@ class NewsRepository(private val context: Context) {
     suspend fun fetchLatestBulletin(): Result<NewsArticle?> =
         fetchFeed(BULLETIN_FEED_URL).map { it.firstOrNull() }
 
-    private fun parseRss(xml: String): List<NewsArticle> {
+    private fun parseRss(xml: String, sourceId: String?): List<NewsArticle> {
         val articles = mutableListOf<NewsArticle>()
         val parser = android.util.Xml.newPullParser()
         parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
@@ -111,6 +111,7 @@ class NewsRepository(private val context: Context) {
                                 pubDate = pubDate?.trim()?.takeIf { it.isNotBlank() },
                                 imageUrl = imageUrl ?: description?.let { extractFirstImageUrl(it) },
                                 audioUrl = audioUrl,
+                                sourceId = sourceId,
                             )
                         }
                         insideItem = false

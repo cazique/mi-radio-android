@@ -27,6 +27,13 @@ data class NewsSource(
     val isCustom: Boolean = false,
 ) {
     companion object {
+        const val FOR_YOU_ID = "para_ti"
+
+        /** Pestaña "Para ti": mezcla las demás fuentes activas en vez de leer
+         *  un feed propio (feedUrl vacía a propósito, NewsViewModel nunca la
+         *  usa para pedir nada). */
+        val ForYou = NewsSource(id = FOR_YOU_ID, label = "Para ti", feedUrl = "")
+
         fun fromCategory(category: NewsCategory): NewsSource =
             NewsSource(id = "cope_${category.name}", label = category.label, feedUrl = category.feedUrl)
 

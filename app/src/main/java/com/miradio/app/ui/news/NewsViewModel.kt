@@ -18,6 +18,8 @@ import com.miradio.app.playback.PlaybackController
 import com.miradio.app.playback.PlaybackServiceConnector
 import com.miradio.app.ui.util.radioApp
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -33,8 +35,8 @@ private val COPE_SOURCES = NewsCategory.entries.map { NewsSource.fromCategory(it
 private const val AUTO_REFRESH_INTERVAL_MS = 10 * 60_000L
 
 data class NewsUiState(
-    val sources: List<NewsSource> = COPE_SOURCES,
-    val selectedSource: NewsSource = COPE_SOURCES.first(),
+    val sources: List<NewsSource> = listOf(NewsSource.ForYou) + COPE_SOURCES,
+    val selectedSource: NewsSource = NewsSource.ForYou,
     val articles: List<NewsArticle> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null,
@@ -58,6 +60,35 @@ sealed class AddSourceState {
  *  "¿es este boletín el que está sonando ahora?" sin necesitar guardar nada. */
 fun bulletinStationId(article: NewsArticle): String = "cope_boletin_${article.link.hashCode()}"
 
+/**
+ * Reparto por rondas: en cada vuelta, cada fuente aporta tantos artículos
+ * como su peso (1 + veces que se le ha leído algo, con un tope para que una
+ * sola fuente muy leída no llegue a tapar por completo a las demás). Da un
+ * mix parejo al principio (todas empiezan en peso 1) que se va inclinando
+ * hacia lo que de verdad se lee, sin depender de comparar fechas entre
+ * medios distintos (formatos de RSS demasiado dispares para fiarse).
+ */
+private fun mergeForYouFeed(perSource: Map<NewsSource, List<NewsArticle>>, affinity: Map<String, Int>): List<NewsArticle> {
+    val queues = perSource.mapValues { (_, articles) -> ArrayDeque(articles) }
+    val weightOf = perSource.keys.associateWith { source -> 1 + (affinity[source.id] ?: 0).coerceAtMost(8) }
+    val orderedSources = perSource.keys.sortedByDescending { weightOf.getValue(it) }
+    val result = mutableListOf<NewsArticle>()
+    var progressed = true
+    while (progressed) {
+        progressed = false
+        for (source in orderedSources) {
+            val queue = queues.getValue(source)
+            repeat(weightOf.getValue(source)) {
+                queue.removeFirstOrNull()?.let {
+                    result += it
+                    progressed = true
+                }
+            }
+        }
+    }
+    return result
+}
+
 class NewsViewModel(
     application: Application,
     private val container: AppContainer,
@@ -65,7 +96,7 @@ class NewsViewModel(
 
     private val customSources = MutableStateFlow<List<NewsSource>>(emptyList())
     private val enabledPresets = MutableStateFlow<List<NewsSource>>(emptyList())
-    private val selectedSource = MutableStateFlow(COPE_SOURCES.first())
+    private val selectedSource = MutableStateFlow(NewsSource.ForYou)
     private val articlesState = MutableStateFlow<Pair<List<NewsArticle>, String?>>(emptyList<NewsArticle>() to null)
     private val isLoading = MutableStateFlow(false)
     private val bulletinState = MutableStateFlow<NewsArticle?>(null)
@@ -85,7 +116,7 @@ class NewsViewModel(
     ) { custom, presets, selected, articlesAndError, loading ->
         val (articles, error) = articlesAndError
         NewsUiState(
-            sources = COPE_SOURCES + presets + custom,
+            sources = listOf(NewsSource.ForYou) + COPE_SOURCES + presets + custom,
             selectedSource = selected,
             articles = articles,
             isLoading = loading,
@@ -109,7 +140,7 @@ class NewsViewModel(
                 enabledPresets.value = PresetNewsSources.all.filter { it.id in enabledIds }
             }
         }
-        load(COPE_SOURCES.first())
+        selectSource(NewsSource.ForYou)
         loadBulletin()
         // Refresco automático mientras se tiene Noticias abierta, para no
         // depender de que alguien se acuerde de tirar hacia abajo a mano.
@@ -120,11 +151,17 @@ class NewsViewModel(
             while (true) {
                 delay(AUTO_REFRESH_INTERVAL_MS)
                 if (container.preferencesRepository.newsAutoRefreshEnabled.first()) {
-                    load(selectedSource.value, forceReload = true)
+                    selectSource(selectedSource.value, forceReload = true)
                     loadBulletin()
                 }
             }
         }
+    }
+
+    /** Punto único de entrada para cargar una pestaña: "Para ti" se resuelve
+     *  mezclando las demás fuentes activas, el resto pide su feed tal cual. */
+    private fun selectSource(source: NewsSource, forceReload: Boolean = false) {
+        if (source.id == NewsSource.FOR_YOU_ID) loadForYou(forceReload) else load(source, forceReload)
     }
 
     private fun loadBulletin() {
@@ -138,12 +175,20 @@ class NewsViewModel(
 
     fun onSourceSelect(newSource: NewsSource) {
         if (newSource == selectedSource.value && (cache.containsKey(newSource.id) || isLoading.value)) return
-        load(newSource)
+        selectSource(newSource)
     }
 
     fun refresh() {
-        load(selectedSource.value, forceReload = true)
+        selectSource(selectedSource.value, forceReload = true)
         loadBulletin()
+    }
+
+    /** Se llama al abrir una noticia (tocarla en la lista): es la única señal
+     *  que alimenta la personalización de "Para ti", ninguna fuente empieza
+     *  favorecida sobre las demás. */
+    fun onArticleOpened(article: NewsArticle) {
+        val sourceId = article.sourceId ?: return
+        viewModelScope.launch { container.preferencesRepository.incrementNewsSourceAffinity(sourceId) }
     }
 
     private val _addSourceState = MutableStateFlow<AddSourceState>(AddSourceState.Idle)
@@ -188,7 +233,7 @@ class NewsViewModel(
         }
         isLoading.value = true
         viewModelScope.launch {
-            container.newsRepository.fetchFeed(newSource.feedUrl)
+            container.newsRepository.fetchFeed(newSource.feedUrl, newSource.id)
                 .onSuccess { articles ->
                     cache[newSource.id] = articles
                     articlesState.value = articles to null
@@ -197,6 +242,41 @@ class NewsViewModel(
                     articlesState.value = emptyList<NewsArticle>() to
                         "No se han podido cargar las noticias de ${newSource.label.lowercase()}."
                 }
+            isLoading.value = false
+        }
+    }
+
+    /** "Para ti": pide en paralelo el feed de cada fuente activa (COPE +
+     *  medios activados + propias) y las mezcla dando más hueco, ronda a
+     *  ronda, a las fuentes que más se leen (ver [PreferencesRepository.newsSourceAffinity]).
+     *  Si alguna fuente falla, sencillamente no aporta nada a la mezcla: un
+     *  medio caído no debe tumbar el resto de la pestaña. */
+    private fun loadForYou(forceReload: Boolean = false) {
+        selectedSource.value = NewsSource.ForYou
+        val cached = cache[NewsSource.FOR_YOU_ID]
+        if (cached != null && !forceReload) {
+            articlesState.value = cached to null
+            return
+        }
+        isLoading.value = true
+        viewModelScope.launch {
+            val activeSources = COPE_SOURCES + enabledPresets.value + customSources.value
+            val perSource = activeSources.map { source ->
+                async {
+                    val existing = cache[source.id]
+                    val articles = if (existing != null && !forceReload) {
+                        existing
+                    } else {
+                        container.newsRepository.fetchFeed(source.feedUrl, source.id).getOrElse { emptyList() }
+                            .also { cache[source.id] = it }
+                    }
+                    source to articles
+                }
+            }.awaitAll().toMap()
+            val affinity = container.preferencesRepository.newsSourceAffinity.first()
+            val merged = mergeForYouFeed(perSource, affinity)
+            cache[NewsSource.FOR_YOU_ID] = merged
+            articlesState.value = merged to null
             isLoading.value = false
         }
     }

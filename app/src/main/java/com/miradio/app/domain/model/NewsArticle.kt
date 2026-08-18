@@ -9,6 +9,10 @@ data class NewsArticle(
     /** Solo presente en feeds de audio (p. ej. el boletín informativo): la
      *  URL del propio MP3 del episodio, lista para reproducir. */
     val audioUrl: String? = null,
+    /** [NewsSource.id] del que viene este artículo. Solo hace falta para
+     *  saber de qué medio es una vez mezclado en la pestaña "Para ti"; en el
+     *  boletín en audio se deja a null porque ahí no aplica. */
+    val sourceId: String? = null,
 )
 
 /**

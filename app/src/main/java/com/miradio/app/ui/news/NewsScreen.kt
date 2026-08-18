@@ -25,6 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.OpenInBrowser
@@ -74,6 +75,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.miradio.app.domain.model.NewsArticle
+import com.miradio.app.domain.model.NewsSource
 import com.miradio.app.util.NewsTts
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -126,6 +128,11 @@ fun NewsScreen(
                         selected = source == state.selectedSource,
                         onClick = { viewModel.onSourceSelect(source) },
                         label = { Text(source.label) },
+                        leadingIcon = if (source.id == NewsSource.FOR_YOU_ID) {
+                            { Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        } else {
+                            null
+                        },
                         trailingIcon = if (source.isCustom) {
                             {
                                 Icon(
@@ -178,9 +185,14 @@ fun NewsScreen(
                     }
                     state.articles.isEmpty() -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
-                            text = "No hay noticias en esta fuente ahora mismo.",
+                            text = if (state.selectedSource.id == NewsSource.FOR_YOU_ID) {
+                                "Activa alguna fuente en Ajustes > Noticias para tener algo que mostrarte aquí."
+                            } else {
+                                "No hay noticias en esta fuente ahora mismo."
+                            },
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(32.dp),
                         )
                     }
                     else -> LazyColumn(
@@ -188,10 +200,18 @@ fun NewsScreen(
                         verticalArrangement = Arrangement.spacedBy(20.dp),
                     ) {
                         items(state.articles, key = { it.link }) { article ->
+                            val sourceLabel = if (state.selectedSource.id == NewsSource.FOR_YOU_ID) {
+                                state.sources.firstOrNull { it.id == article.sourceId }?.label ?: ""
+                            } else {
+                                state.selectedSource.label
+                            }
                             NewsArticleCard(
                                 article = article,
-                                sourceLabel = state.selectedSource.label,
-                                onClick = { selectedArticle = article },
+                                sourceLabel = sourceLabel,
+                                onClick = {
+                                    selectedArticle = article
+                                    viewModel.onArticleOpened(article)
+                                },
                             )
                         }
                     }
@@ -201,7 +221,12 @@ fun NewsScreen(
     }
 
     selectedArticle?.let { article ->
-        NewsDetailDialog(article = article, sourceLabel = state.selectedSource.label, onDismiss = { selectedArticle = null })
+        val sourceLabel = if (state.selectedSource.id == NewsSource.FOR_YOU_ID) {
+            state.sources.firstOrNull { it.id == article.sourceId }?.label ?: ""
+        } else {
+            state.selectedSource.label
+        }
+        NewsDetailDialog(article = article, sourceLabel = sourceLabel, onDismiss = { selectedArticle = null })
     }
 
     if (showAddSourceDialog) {
@@ -463,7 +488,7 @@ private fun NewsDetailDialog(article: NewsArticle, sourceLabel: String, onDismis
                         modifier = Modifier.padding(top = 24.dp, bottom = 8.dp),
                     ) {
                         Icon(Icons.Filled.OpenInBrowser, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                        Text("Leer completa en cope.es")
+                        Text(if (sourceLabel.isNotBlank()) "Leer completa en $sourceLabel" else "Leer completa")
                     }
                 }
             }

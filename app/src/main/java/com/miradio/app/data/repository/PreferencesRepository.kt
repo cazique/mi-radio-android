@@ -49,6 +49,7 @@ class PreferencesRepository(private val context: Context) {
         val AEMET_MUNICIPIO_NAME = stringPreferencesKey("aemet_municipio_name")
         val ENABLED_PRESET_NEWS_SOURCES = stringPreferencesKey("enabled_preset_news_sources")
         val LOG_UPLOAD_WEBHOOK_URL = stringPreferencesKey("log_upload_webhook_url")
+        val NEWS_SOURCE_AFFINITY = stringPreferencesKey("news_source_affinity")
     }
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -153,6 +154,15 @@ class PreferencesRepository(private val context: Context) {
      *  sigue ofreciendo solo el botón manual de compartir. */
     val logUploadWebhookUrl: Flow<String?> = context.dataStore.data.map {
         it[Keys.LOG_UPLOAD_WEBHOOK_URL]?.takeIf { url -> url.isNotBlank() }
+    }
+
+    /** Cuántas veces se ha abierto una noticia de cada fuente (id de
+     *  [com.miradio.app.domain.model.NewsSource]). Es la única señal de
+     *  personalización de la pestaña "Para ti": ninguna fuente empieza
+     *  favorecida, solo gana peso la que de verdad se lee. */
+    val newsSourceAffinity: Flow<Map<String, Int>> = context.dataStore.data.map { prefs ->
+        val raw = prefs[Keys.NEWS_SOURCE_AFFINITY] ?: return@map emptyMap()
+        runCatching { json.decodeFromString<Map<String, Int>>(raw) }.getOrDefault(emptyMap())
     }
 
     suspend fun setLastStation(id: String) {
@@ -264,6 +274,18 @@ class PreferencesRepository(private val context: Context) {
                 ?.let { runCatching { json.decodeFromString<List<CustomNewsSource>>(it) }.getOrDefault(emptyList()) }
                 ?: emptyList()
             prefs[Keys.CUSTOM_NEWS_SOURCES] = json.encodeToString(current.filterNot { it.id == id })
+        }
+    }
+
+    /** Suma una lectura de [sourceId] a su afinidad, la señal que usa "Para
+     *  ti" para dar más peso a las fuentes que de verdad se leen. */
+    suspend fun incrementNewsSourceAffinity(sourceId: String) {
+        context.dataStore.edit { prefs ->
+            val current = prefs[Keys.NEWS_SOURCE_AFFINITY]
+                ?.let { runCatching { json.decodeFromString<Map<String, Int>>(it) }.getOrDefault(emptyMap()) }
+                ?: emptyMap()
+            val updated = current + (sourceId to (current[sourceId] ?: 0) + 1)
+            prefs[Keys.NEWS_SOURCE_AFFINITY] = json.encodeToString(updated)
         }
     }
 
