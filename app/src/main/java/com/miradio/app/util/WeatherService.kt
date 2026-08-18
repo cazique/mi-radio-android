@@ -40,6 +40,7 @@ class WeatherService(
         val url = "https://api.open-meteo.com/v1/forecast" +
             "?latitude=${location.latitude}&longitude=${location.longitude}" +
             "&current=temperature_2m,weather_code,is_day" +
+            "&hourly=precipitation_probability" +
             "&daily=weather_code,temperature_2m_max,temperature_2m_min" +
             "&forecast_days=6&timezone=auto"
         val request = Request.Builder().url(url).get().build()
@@ -64,6 +65,12 @@ class WeatherService(
                 } else {
                     emptyList()
                 }
+                // El índice "hora actual" en el array horario: con timezone=auto,
+                // Open-Meteo empieza el array en la medianoche local de hoy, así
+                // que la hora del sistema es directamente el índice.
+                val currentHourIndex = java.text.SimpleDateFormat("H", Locale.getDefault())
+                    .format(java.util.Date()).toIntOrNull()
+                val rainProbability = currentHourIndex?.let { dto.hourly?.precipitationProbability?.getOrNull(it) }
                 val placeName = reverseGeocode(context, location)
                 WeatherResult.Success(
                     WeatherInfo(
@@ -72,6 +79,7 @@ class WeatherService(
                         currentWeatherCode = current.weatherCode,
                         isDay = current.isDay == 1,
                         daily = forecasts,
+                        currentRainProbabilityPercent = rainProbability,
                     ),
                 )
             }
@@ -109,6 +117,12 @@ class WeatherService(
     private data class OpenMeteoResponse(
         val current: CurrentBlock? = null,
         val daily: DailyBlock? = null,
+        val hourly: HourlyBlock? = null,
+    )
+
+    @Serializable
+    private data class HourlyBlock(
+        @SerialName("precipitation_probability") val precipitationProbability: List<Int> = emptyList(),
     )
 
     @Serializable

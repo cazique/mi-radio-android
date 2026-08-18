@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.miradio.app.AppContainer
+import com.miradio.app.domain.model.AemetSnapshot
 import com.miradio.app.domain.model.WeatherInfo
 import com.miradio.app.ui.util.radioApp
 import com.miradio.app.util.DiagnosticsLog
@@ -13,6 +14,7 @@ import com.miradio.app.util.LocationProvider
 import com.miradio.app.util.WeatherResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -23,6 +25,16 @@ sealed class WeatherUiState {
     data class Loaded(val weather: WeatherInfo) : WeatherUiState()
     data class Error(val message: String) : WeatherUiState()
 }
+
+/** Estado de la comparación con AEMET, que se pide solo al desplegar la
+ *  tarjeta del tiempo (no en cada apertura de Inicio, para no gastar la
+ *  cuota de peticiones de AEMET sin que nadie llegue a mirarlo). */
+data class AemetComparisonState(
+    val configured: Boolean = false,
+    val snapshot: AemetSnapshot? = null,
+    val isLoading: Boolean = false,
+    val error: String? = null,
+)
 
 class WeatherViewModel(
     application: Application,
@@ -67,6 +79,34 @@ class WeatherViewModel(
                     _state.value = WeatherUiState.Error(result.reason)
                 }
             }
+        }
+    }
+
+    private val _aemetState = MutableStateFlow(AemetComparisonState())
+    val aemetState: StateFlow<AemetComparisonState> = _aemetState
+
+    /** Se llama al desplegar la tarjeta del tiempo (no antes): así una
+     *  clave de AEMET configurada no gasta peticiones si nunca se llega a
+     *  mirar la comparación. */
+    fun loadAemetComparison() {
+        viewModelScope.launch {
+            val context = getApplication<Application>()
+            val apiKey = container.preferencesRepository.aemetApiKey.first()
+            val municipio = container.preferencesRepository.aemetMunicipio.first()
+            if (apiKey == null || municipio == null) {
+                _aemetState.value = AemetComparisonState(configured = false)
+                return@launch
+            }
+            _aemetState.value = AemetComparisonState(configured = true, isLoading = true)
+            container.aemetService.fetchCurrentConditions(context, apiKey, municipio.first)
+                .onSuccess { snapshot -> _aemetState.value = AemetComparisonState(configured = true, snapshot = snapshot) }
+                .onFailure { e ->
+                    DiagnosticsLog.logWarning(context, "WeatherViewModel", "AEMET falló: ${e.message}")
+                    _aemetState.value = AemetComparisonState(
+                        configured = true,
+                        error = "No se ha podido comparar con AEMET: ${e.message ?: "error desconocido"}",
+                    )
+                }
         }
     }
 

@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Accessibility
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.DarkMode
@@ -84,6 +85,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.miradio.app.BuildConfig
 import com.miradio.app.R
+import com.miradio.app.domain.model.AemetMunicipio
 import com.miradio.app.domain.model.ThemeMode
 import com.miradio.app.util.AppUpdater
 import com.miradio.app.util.DiagnosticsLog
@@ -182,6 +184,21 @@ fun SettingsScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SectionHeader(Icons.Filled.Newspaper, SectionPurple, "Noticias")
                     NewsAutoRefreshSection(enabled = state.newsAutoRefresh, onEnabledChange = viewModel::onNewsAutoRefreshChange)
+                }
+
+                HorizontalDivider()
+
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SectionHeader(Icons.Filled.Cloud, SectionPurple, "Clima")
+                    AemetSection(
+                        apiKey = state.aemetApiKey,
+                        municipioName = state.aemetMunicipioName,
+                        searchState = viewModel.aemetSearch.collectAsState().value,
+                        onApiKeySave = viewModel::onAemetApiKeySave,
+                        onDisable = viewModel::onAemetDisable,
+                        onQueryChange = viewModel::onAemetMunicipioQuery,
+                        onMunicipioSelect = viewModel::onAemetMunicipioSelect,
+                    )
                 }
             }
 
@@ -585,6 +602,86 @@ private fun NewsAutoRefreshSection(enabled: Boolean, onEnabledChange: (Boolean) 
             )
         }
         Switch(checked = enabled, onCheckedChange = onEnabledChange)
+    }
+}
+
+/**
+ * AEMET OpenData es opcional y de cada usuario: se pide la clave gratuita
+ * en aemet.es y se pega aquí. Nunca se manda a ningún sitio nuestro ni va
+ * en el APK — solo se guarda en este dispositivo y se usa directamente
+ * contra la API de AEMET. Sin clave (el caso por defecto), el tiempo sigue
+ * funcionando con Open-Meteo tal cual.
+ */
+@Composable
+private fun AemetSection(
+    apiKey: String,
+    municipioName: String?,
+    searchState: AemetSearchState,
+    onApiKeySave: (String) -> Unit,
+    onDisable: () -> Unit,
+    onQueryChange: (String) -> Unit,
+    onMunicipioSelect: (AemetMunicipio) -> Unit,
+) {
+    var editableKey by remember(apiKey) { mutableStateOf(apiKey) }
+    var query by remember { mutableStateOf("") }
+
+    Text(
+        text = "Usa AEMET (además de Open-Meteo) para comparar el tiempo oficial de España. " +
+            "Necesita una clave gratuita de aemet.es/opendata; se guarda solo en este móvil.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    OutlinedTextField(
+        value = editableKey,
+        onValueChange = { editableKey = it },
+        label = { Text("Clave de AEMET OpenData") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(onClick = { onApiKeySave(editableKey) }, enabled = editableKey.isNotBlank()) { Text("Guardar clave") }
+        if (apiKey.isNotBlank()) {
+            OutlinedButton(onClick = onDisable) { Text("Desactivar AEMET") }
+        }
+    }
+
+    if (apiKey.isNotBlank()) {
+        Text(
+            text = municipioName?.let { "Municipio: $it" } ?: "Todavía no has elegido municipio.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        OutlinedTextField(
+            value = query,
+            onValueChange = {
+                query = it
+                onQueryChange(it)
+            },
+            label = { Text("Buscar tu municipio") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (searchState.isLoading) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                Text("Descargando listado de municipios (la primera vez tarda un poco)…", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        searchState.error?.let { error ->
+            Text(text = error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
+        searchState.results.forEach { municipio ->
+            Text(
+                text = municipio.nombre,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        query = ""
+                        onMunicipioSelect(municipio)
+                    }
+                    .padding(vertical = 8.dp),
+            )
+        }
     }
 }
 

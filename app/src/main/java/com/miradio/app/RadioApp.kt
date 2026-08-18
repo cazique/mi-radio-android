@@ -12,6 +12,7 @@ import com.miradio.app.domain.usecase.RefreshRemoteStationsUseCase
 import com.miradio.app.domain.usecase.ToggleFavoriteUseCase
 import com.miradio.app.domain.usecase.UpdateStationUseCase
 import com.miradio.app.domain.usecase.ValidateStreamUrlUseCase
+import com.miradio.app.util.AemetService
 import com.miradio.app.util.DiagnosticsLog
 import com.miradio.app.util.UpdateChecker
 import com.miradio.app.util.WeatherService
@@ -42,6 +43,7 @@ class AppContainer(app: Application) {
     }
     val newsRepository by lazy { NewsRepository(app) }
     val weatherService by lazy { WeatherService() }
+    val aemetService by lazy { AemetService() }
 }
 
 class RadioApp : Application() {

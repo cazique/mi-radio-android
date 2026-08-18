@@ -17,4 +17,7 @@ data class WeatherInfo(
     val isDay: Boolean,
     /** Del día de hoy en adelante, orden cronológico (normalmente 6 días). */
     val daily: List<DailyForecast>,
+    /** Probabilidad de lluvia (%) para la hora en curso, si Open-Meteo la ha
+     *  dado. Solo se usa para comparar con AEMET al desplegar el tiempo. */
+    val currentRainProbabilityPercent: Int? = null,
 )

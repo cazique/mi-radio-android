@@ -3,6 +3,7 @@ package com.miradio.app.ui.components
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,20 +16,27 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.miradio.app.domain.model.AemetSnapshot
 import com.miradio.app.domain.model.DailyForecast
 import com.miradio.app.domain.model.WeatherInfo
+import com.miradio.app.ui.weather.AemetComparisonState
 import com.miradio.app.ui.weather.WeatherUiState
 import com.miradio.app.ui.weather.WeatherViewModel
 import com.miradio.app.util.weatherDescription
@@ -82,7 +90,22 @@ fun WeatherCard(
                 )
                 TextButton(onClick = viewModel::retry) { Text("Reintentar") }
             }
-            is WeatherUiState.Loaded -> WeatherLoadedContent(current.weather)
+            is WeatherUiState.Loaded -> {
+                var expanded by remember { mutableStateOf(false) }
+                val aemetState by viewModel.aemetState.collectAsState()
+                LaunchedEffect(expanded) {
+                    if (expanded) viewModel.loadAemetComparison()
+                }
+                Column(
+                    modifier = Modifier.clickable { expanded = !expanded },
+                ) {
+                    WeatherLoadedContent(current.weather)
+                    if (expanded) {
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                        WeatherComparisonSection(openMeteo = current.weather, aemet = aemetState)
+                    }
+                }
+            }
         }
     }
 }
@@ -173,6 +196,60 @@ private fun DailyForecastItem(day: DailyForecast) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+}
+
+/**
+ * Comparativa AEMET vs Open-Meteo, solo visible al desplegar la tarjeta.
+ * Si AEMET no está configurado (sin clave o sin municipio elegido en
+ * Ajustes > Clima), se explica cómo activarlo en vez de dejar un hueco
+ * vacío sin más.
+ */
+@Composable
+private fun WeatherComparisonSection(openMeteo: WeatherInfo, aemet: AemetComparisonState) {
+    Column(modifier = Modifier.padding(16.dp)) {
+        Text("Comparar fuentes", style = MaterialTheme.typography.titleSmall)
+        Row(modifier = Modifier.padding(top = 8.dp).fillMaxWidth()) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Open-Meteo", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                Text("${openMeteo.currentTempC.roundToInt()}°  ${weatherDescription(openMeteo.currentWeatherCode)}", style = MaterialTheme.typography.bodyMedium)
+                openMeteo.currentRainProbabilityPercent?.let {
+                    Text("Lluvia: $it %", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text("Ahora mismo", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text("AEMET", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                when {
+                    !aemet.configured -> Text(
+                        "Sin configurar. Añade tu clave gratuita en Ajustes > Clima.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    aemet.isLoading -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                        Text("Consultando…", style = MaterialTheme.typography.bodySmall)
+                    }
+                    aemet.error != null -> Text(
+                        aemet.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    aemet.snapshot != null -> AemetSnapshotColumn(aemet.snapshot)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AemetSnapshotColumn(snapshot: AemetSnapshot) {
+    val tempText = snapshot.tempC?.let { "${it.roundToInt()}°" } ?: "—"
+    val skyText = snapshot.skyDescription ?: ""
+    Text("$tempText  $skyText".trim(), style = MaterialTheme.typography.bodyMedium)
+    snapshot.rainProbabilityPercent?.let {
+        Text("Lluvia: $it %", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    Text("Hora ${snapshot.hourLabel}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 private fun dayLabel(isoDate: String): String = runCatching {

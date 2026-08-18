@@ -44,6 +44,9 @@ class PreferencesRepository(private val context: Context) {
         val LAST_SEEN_CHANGELOG_ID = intPreferencesKey("last_seen_changelog_id")
         val CUSTOM_NEWS_SOURCES = stringPreferencesKey("custom_news_sources")
         val NEWS_AUTO_REFRESH = booleanPreferencesKey("news_auto_refresh")
+        val AEMET_API_KEY = stringPreferencesKey("aemet_api_key")
+        val AEMET_MUNICIPIO_ID = stringPreferencesKey("aemet_municipio_id")
+        val AEMET_MUNICIPIO_NAME = stringPreferencesKey("aemet_municipio_name")
     }
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -120,6 +123,20 @@ class PreferencesRepository(private val context: Context) {
      *  mano. Activado por defecto. */
     val newsAutoRefreshEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.NEWS_AUTO_REFRESH] ?: true }
 
+    /** Clave personal de AEMET OpenData, puesta a mano por quien usa la app
+     *  en Ajustes > Clima. Solo vive en este dispositivo: nunca va en el
+     *  APK ni se sube a ningún sitio (ver la explicación de por qué no se
+     *  puede/debe embeber una clave personal en una app pública). Null =
+     *  AEMET desactivado, se usa solo Open-Meteo. */
+    val aemetApiKey: Flow<String?> = context.dataStore.data.map { it[Keys.AEMET_API_KEY]?.takeIf { key -> key.isNotBlank() } }
+
+    /** Municipio elegido para AEMET (id "idNNNNN" + nombre para mostrar). */
+    val aemetMunicipio: Flow<Pair<String, String>?> = context.dataStore.data.map { prefs ->
+        val id = prefs[Keys.AEMET_MUNICIPIO_ID]
+        val name = prefs[Keys.AEMET_MUNICIPIO_NAME]
+        if (id != null && name != null) id to name else null
+    }
+
     suspend fun setLastStation(id: String) {
         context.dataStore.edit { it[Keys.LAST_STATION_ID] = id }
     }
@@ -180,6 +197,25 @@ class PreferencesRepository(private val context: Context) {
 
     suspend fun setNewsAutoRefreshEnabled(enabled: Boolean) {
         context.dataStore.edit { it[Keys.NEWS_AUTO_REFRESH] = enabled }
+    }
+
+    suspend fun setAemetApiKey(key: String) {
+        context.dataStore.edit { it[Keys.AEMET_API_KEY] = key.trim() }
+    }
+
+    suspend fun clearAemetApiKey() {
+        context.dataStore.edit {
+            it.remove(Keys.AEMET_API_KEY)
+            it.remove(Keys.AEMET_MUNICIPIO_ID)
+            it.remove(Keys.AEMET_MUNICIPIO_NAME)
+        }
+    }
+
+    suspend fun setAemetMunicipio(id: String, name: String) {
+        context.dataStore.edit {
+            it[Keys.AEMET_MUNICIPIO_ID] = id
+            it[Keys.AEMET_MUNICIPIO_NAME] = name
+        }
     }
 
     suspend fun addCustomNewsSource(name: String, feedUrl: String) {

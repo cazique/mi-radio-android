@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.lifecycle.viewmodel.initializer
 import com.miradio.app.AppContainer
 import com.miradio.app.data.repository.CatalogSyncResult
+import com.miradio.app.domain.model.AemetMunicipio
 import com.miradio.app.domain.model.ThemeMode
 import com.miradio.app.ui.util.radioApp
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,6 +30,14 @@ data class SettingsUiState(
     val hideAddButton: Boolean = false,
     val dynamicColor: Boolean = false,
     val newsAutoRefresh: Boolean = true,
+    val aemetApiKey: String = "",
+    val aemetMunicipioName: String? = null,
+)
+
+data class AemetSearchState(
+    val results: List<AemetMunicipio> = emptyList(),
+    val isLoading: Boolean = false,
+    val error: String? = null,
 )
 
 class SettingsViewModel(
@@ -66,7 +75,15 @@ class SettingsViewModel(
         state.copy(dynamicColor = dynamic)
     }.combine(container.preferencesRepository.newsAutoRefreshEnabled) { state, autoRefresh ->
         state.copy(newsAutoRefresh = autoRefresh)
+    }.combine(container.preferencesRepository.aemetApiKey) { state, key ->
+        state.copy(aemetApiKey = key.orEmpty())
+    }.combine(container.preferencesRepository.aemetMunicipio) { state, municipio ->
+        state.copy(aemetMunicipioName = municipio?.second)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
+
+    private val _aemetSearch = MutableStateFlow(AemetSearchState())
+    val aemetSearch: StateFlow<AemetSearchState> = _aemetSearch
+    private var allMunicipios: List<AemetMunicipio>? = null
 
     fun onThemeModeChange(mode: ThemeMode) {
         viewModelScope.launch { container.preferencesRepository.setThemeMode(mode) }
@@ -98,6 +115,55 @@ class SettingsViewModel(
 
     fun onRemoteUrlChange(url: String) {
         editableUrl.value = url
+    }
+
+    fun onAemetApiKeySave(key: String) {
+        viewModelScope.launch { container.preferencesRepository.setAemetApiKey(key) }
+    }
+
+    fun onAemetDisable() {
+        viewModelScope.launch { container.preferencesRepository.clearAemetApiKey() }
+        allMunicipios = null
+        _aemetSearch.value = AemetSearchState()
+    }
+
+    /** Descarga el maestro de municipios (o lo coge de caché) la primera vez
+     *  que se busca, y filtra en memoria por nombre en las siguientes. */
+    fun onAemetMunicipioQuery(query: String) {
+        val key = uiState.value.aemetApiKey
+        if (key.isBlank()) return
+        if (query.isBlank()) {
+            _aemetSearch.value = AemetSearchState()
+            return
+        }
+        val cached = allMunicipios
+        if (cached != null) {
+            _aemetSearch.value = AemetSearchState(results = filterMunicipios(cached, query))
+            return
+        }
+        viewModelScope.launch {
+            _aemetSearch.value = AemetSearchState(isLoading = true)
+            container.aemetService.fetchMunicipios(getApplication(), key)
+                .onSuccess { municipios ->
+                    allMunicipios = municipios
+                    _aemetSearch.value = AemetSearchState(results = filterMunicipios(municipios, query))
+                }
+                .onFailure {
+                    _aemetSearch.value = AemetSearchState(
+                        error = "No se ha podido descargar el listado de municipios: ${it.message ?: "error desconocido"}",
+                    )
+                }
+        }
+    }
+
+    private fun filterMunicipios(all: List<AemetMunicipio>, query: String): List<AemetMunicipio> {
+        val normalized = query.trim().lowercase()
+        return all.filter { it.nombre.lowercase().contains(normalized) }.take(30)
+    }
+
+    fun onAemetMunicipioSelect(municipio: AemetMunicipio) {
+        viewModelScope.launch { container.preferencesRepository.setAemetMunicipio(municipio.id, municipio.nombre) }
+        _aemetSearch.value = AemetSearchState()
     }
 
     fun refreshRemoteCatalog() {

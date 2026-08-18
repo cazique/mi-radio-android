@@ -44,6 +44,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -141,6 +142,8 @@ fun HomeLandingScreen(
         ) {
             NotificationPermissionBanner()
             UpdateAvailableBanner()
+
+            ClockHeader(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
 
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 DeviceIndicator(
@@ -320,6 +323,39 @@ private fun NotificationPermissionBanner() {
                 }
             }
         }
+    }
+}
+
+/**
+ * Hora y fecha grandes, integradas en Inicio (sin tarjeta aparatosa, para
+ * que no compita con "ahora suena"). Se actualiza cada minuto por su
+ * cuenta mientras la pantalla está abierta, usando la zona horaria del
+ * propio dispositivo.
+ */
+@Composable
+private fun ClockHeader(modifier: Modifier = Modifier) {
+    var now by remember { mutableStateOf(java.util.Date()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            now = java.util.Date()
+            // Se espera hasta el siguiente cambio de minuto, no un delay fijo
+            // de 60s: así no se acumula un desfase que acabaría mostrando la
+            // hora con varios segundos de retraso tras un buen rato abierta.
+            val msIntoMinute = System.currentTimeMillis() % 60_000L
+            kotlinx.coroutines.delay(60_000L - msIntoMinute)
+        }
+    }
+    val timeText = remember(now) {
+        java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(now)
+    }
+    val dateText = remember(now) {
+        java.text.SimpleDateFormat("EEEE, d 'de' MMMM", java.util.Locale("es", "ES"))
+            .format(now)
+            .replaceFirstChar { it.uppercase() }
+    }
+    Column(modifier = modifier) {
+        Text(text = timeText, style = MaterialTheme.typography.displayMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+        Text(text = dateText, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
