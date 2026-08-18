@@ -16,6 +16,19 @@ data class ChangelogEntry(val id: Int, val title: String, val bullets: List<Stri
 object Changelog {
     val entries: List<ChangelogEntry> = listOf(
         ChangelogEntry(
+            id = 7,
+            title = "Noticias más completas y colores del sistema por defecto",
+            bullets = listOf(
+                "Cada noticia muestra ahora la fecha y hora de publicación.",
+                "Tirar hacia abajo en Noticias las actualiza (además del refresco automático).",
+                "Arreglado que el último boletín se quedaba siempre fijo en el mismo episodio.",
+                "Se pueden activar El Mundo, ABC, La Razón y OKDiario como fuentes adicionales en Ajustes > Noticias, además de añadir cualquier otra por su RSS.",
+                "Los colores del sistema (Material You) vienen activados por defecto en Android 12+.",
+                "Ajustes > Diagnóstico: se puede poner una URL propia para subir el registro solo tras un cierre inesperado, sin tener que compartirlo a mano.",
+                "El diálogo de Novedades indica ahora el número de versión de cada cambio.",
+            ),
+        ),
+        ChangelogEntry(
             id = 6,
             title = "Botón de reproducir arreglado",
             bullets = listOf(

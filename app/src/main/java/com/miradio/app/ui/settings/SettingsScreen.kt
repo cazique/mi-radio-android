@@ -184,6 +184,10 @@ fun SettingsScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SectionHeader(Icons.Filled.Newspaper, SectionPurple, "Noticias")
                     NewsAutoRefreshSection(enabled = state.newsAutoRefresh, onEnabledChange = viewModel::onNewsAutoRefreshChange)
+                    PresetNewsSourcesSection(
+                        enabledIds = state.enabledPresetSources,
+                        onToggle = viewModel::onPresetSourceToggle,
+                    )
                 }
 
                 HorizontalDivider()
@@ -231,7 +235,10 @@ fun SettingsScreen(
                 HorizontalDivider()
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SectionHeader(Icons.Filled.Shield, SectionPurple, "Diagnóstico")
-                    DiagnosticsSection()
+                    DiagnosticsSection(
+                        webhookUrl = state.logUploadWebhookUrl,
+                        onWebhookSave = viewModel::onLogUploadWebhookSave,
+                    )
                 }
             }
         }
@@ -441,7 +448,10 @@ fun ChangelogDialog(onDismiss: () -> Unit) {
             ) {
                 com.miradio.app.util.Changelog.entries.forEach { entry ->
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(entry.title, style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            text = "Versión ${entry.id} · ${entry.title}",
+                            style = MaterialTheme.typography.titleSmall,
+                        )
                         entry.bullets.forEach { bullet ->
                             Text(
                                 text = "•  $bullet",
@@ -602,6 +612,35 @@ private fun NewsAutoRefreshSection(enabled: Boolean, onEnabledChange: (Boolean) 
             )
         }
         Switch(checked = enabled, onCheckedChange = onEnabledChange)
+    }
+}
+
+/**
+ * Medios conocidos que se pueden sumar a las secciones de COPE con un
+ * interruptor, sin tener que teclear su URL de RSS a mano en "Añadir"
+ * dentro de Noticias. Desactivados todos por defecto.
+ */
+@Composable
+private fun PresetNewsSourcesSection(enabledIds: Set<String>, onToggle: (String, Boolean) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = "Otros medios",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        com.miradio.app.domain.model.PresetNewsSources.all.forEach { source ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(source.label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                Switch(
+                    checked = source.id in enabledIds,
+                    onCheckedChange = { checked -> onToggle(source.id, checked) },
+                )
+            }
+        }
     }
 }
 
@@ -767,12 +806,13 @@ private fun DebugModeSection(enabled: Boolean, onEnabledChange: (Boolean) -> Uni
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun DiagnosticsSection() {
+private fun DiagnosticsSection(webhookUrl: String, onWebhookSave: (String) -> Unit) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
     var logText by remember { mutableStateOf("") }
     var copied by remember { mutableStateOf(false) }
+    var editableWebhook by remember(webhookUrl) { mutableStateOf(webhookUrl) }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
@@ -825,6 +865,26 @@ private fun DiagnosticsSection() {
                     .heightIn(max = 260.dp)
                     .verticalScroll(rememberScrollState()),
             )
+        }
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+        Text(
+            text = "Subida automática tras un cierre inesperado: pega aquí la URL de un sitio " +
+                "tuyo que acepte POST con el registro como texto (un webhook propio, por ejemplo). " +
+                "Sin nada aquí, sigue funcionando igual: solo con el botón de compartir de arriba.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = editableWebhook,
+                onValueChange = { editableWebhook = it },
+                label = { Text("URL de subida (opcional)") },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+            )
+            Button(onClick = { onWebhookSave(editableWebhook) }) { Text("Guardar") }
         }
     }
 }

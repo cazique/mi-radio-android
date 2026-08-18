@@ -49,6 +49,7 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PullToRefreshBox
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -156,31 +157,43 @@ fun NewsScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            when {
-                state.isLoading -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-                state.error != null -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = state.error ?: "",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(32.dp),
-                    )
-                }
-                state.articles.isEmpty() -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "No hay noticias en esta fuente ahora mismo.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                else -> LazyColumn(
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(20.dp),
-                ) {
-                    items(state.articles, key = { it.link }) { article ->
-                        NewsArticleCard(article = article, onClick = { selectedArticle = article })
+            // Tirar hacia abajo para refrescar, además del refresco automático
+            // cada 10 min: para quien no quiere esperar.
+            PullToRefreshBox(
+                isRefreshing = state.isLoading,
+                onRefresh = viewModel::refresh,
+                modifier = Modifier.weight(1f),
+            ) {
+                when {
+                    state.isLoading && state.articles.isEmpty() -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                    state.error != null -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = state.error ?: "",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(32.dp),
+                        )
+                    }
+                    state.articles.isEmpty() -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "No hay noticias en esta fuente ahora mismo.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    else -> LazyColumn(
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(20.dp),
+                    ) {
+                        items(state.articles, key = { it.link }) { article ->
+                            NewsArticleCard(
+                                article = article,
+                                sourceLabel = state.selectedSource.label,
+                                onClick = { selectedArticle = article },
+                            )
+                        }
                     }
                 }
             }
@@ -188,7 +201,7 @@ fun NewsScreen(
     }
 
     selectedArticle?.let { article ->
-        NewsDetailDialog(article = article, onDismiss = { selectedArticle = null })
+        NewsDetailDialog(article = article, sourceLabel = state.selectedSource.label, onDismiss = { selectedArticle = null })
     }
 
     if (showAddSourceDialog) {
@@ -294,7 +307,7 @@ private fun AddNewsSourceDialog(
  * sin experiencia con apps, sepa qué tocar).
  */
 @Composable
-private fun NewsArticleCard(article: NewsArticle, onClick: () -> Unit) {
+private fun NewsArticleCard(article: NewsArticle, sourceLabel: String, onClick: () -> Unit) {
     Card(
         onClick = onClick,
         shape = RoundedCornerShape(20.dp),
@@ -318,7 +331,7 @@ private fun NewsArticleCard(article: NewsArticle, onClick: () -> Unit) {
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
-            val subtitle = listOfNotNull("COPE", formatRelativeTime(article.pubDate)).joinToString(" · ")
+            val subtitle = listOfNotNull(sourceLabel, formatArticleDate(article.pubDate)).joinToString(" · ")
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodyMedium,
@@ -336,7 +349,7 @@ private fun NewsArticleCard(article: NewsArticle, onClick: () -> Unit) {
  *  poder agrandar solo el texto de la noticia sin tocar el resto de la app. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NewsDetailDialog(article: NewsArticle, onDismiss: () -> Unit) {
+private fun NewsDetailDialog(article: NewsArticle, sourceLabel: String, onDismiss: () -> Unit) {
     val context = LocalContext.current
     // 1.15f de partida: algo más grande que el cuerpo de texto normal de la
     // app, pensado para que se lea cómodo desde el principio sin tener que
@@ -410,7 +423,7 @@ private fun NewsDetailDialog(article: NewsArticle, onDismiss: () -> Unit) {
                         ),
                         fontWeight = FontWeight.Bold,
                     )
-                    val subtitle = listOfNotNull("COPE", formatRelativeTime(article.pubDate)).joinToString(" · ")
+                    val subtitle = listOfNotNull(sourceLabel, formatArticleDate(article.pubDate)).joinToString(" · ")
                     Text(
                         text = subtitle,
                         style = MaterialTheme.typography.bodyMedium,
@@ -529,21 +542,29 @@ private fun BulletinCard(
 }
 
 /** Los RSS traen la fecha en formato RFC-822 ("Wed, 12 Aug 2026 10:00:00
- *  +0200"); se convierte a "hace X min/h/d" para que se lea de un vistazo,
- *  como en cualquier app de noticias. Si no se puede interpretar (formato
- *  distinto según la sección), simplemente no se muestra nada de fecha en
- *  vez de enseñar el texto en crudo. */
-private fun formatRelativeTime(pubDate: String?): String? {
+ *  +0200", aunque no todos los medios lo escriben exactamente igual, de ahí
+ *  varios patrones). Se muestra fecha y hora tal cual (pedido explícito:
+ *  "que se vea la fecha y hora de la noticia") en vez de un "hace X"
+ *  relativo, más ambiguo pasadas unas horas. Si no se puede interpretar,
+ *  no se muestra nada de fecha en vez de enseñar el texto en crudo. */
+private fun formatArticleDate(pubDate: String?): String? {
     if (pubDate.isNullOrBlank()) return null
-    val patterns = listOf("EEE, dd MMM yyyy HH:mm:ss Z", "EEE, dd MMM yyyy HH:mm:ss zzz")
+    val patterns = listOf(
+        "EEE, dd MMM yyyy HH:mm:ss Z",
+        "EEE, dd MMM yyyy HH:mm:ss zzz",
+        "yyyy-MM-dd'T'HH:mm:ssXXX",
+        "yyyy-MM-dd'T'HH:mm:ss'Z'",
+    )
     val parsedMillis = patterns.firstNotNullOfOrNull { pattern ->
         runCatching { SimpleDateFormat(pattern, Locale.ENGLISH).parse(pubDate)?.time }.getOrNull()
     } ?: return null
     val diffMs = (System.currentTimeMillis() - parsedMillis).coerceAtLeast(0)
+    // "ahora"/"hace X min" solo para lo muy reciente (más útil que una hora
+    // exacta cuando acaba de publicarse); a partir de ahí, fecha y hora
+    // tal cual.
     return when {
         diffMs < TimeUnit.MINUTES.toMillis(1) -> "ahora"
         diffMs < TimeUnit.HOURS.toMillis(1) -> "hace ${TimeUnit.MILLISECONDS.toMinutes(diffMs)} min"
-        diffMs < TimeUnit.DAYS.toMillis(1) -> "hace ${TimeUnit.MILLISECONDS.toHours(diffMs)} h"
-        else -> "hace ${TimeUnit.MILLISECONDS.toDays(diffMs)} d"
+        else -> SimpleDateFormat("d MMM, HH:mm", Locale("es", "ES")).format(java.util.Date(parsedMillis))
     }
 }

@@ -32,6 +32,8 @@ data class SettingsUiState(
     val newsAutoRefresh: Boolean = true,
     val aemetApiKey: String = "",
     val aemetMunicipioName: String? = null,
+    val enabledPresetSources: Set<String> = emptySet(),
+    val logUploadWebhookUrl: String = "",
 )
 
 data class AemetSearchState(
@@ -79,6 +81,10 @@ class SettingsViewModel(
         state.copy(aemetApiKey = key.orEmpty())
     }.combine(container.preferencesRepository.aemetMunicipio) { state, municipio ->
         state.copy(aemetMunicipioName = municipio?.second)
+    }.combine(container.preferencesRepository.enabledPresetNewsSources) { state, enabled ->
+        state.copy(enabledPresetSources = enabled)
+    }.combine(container.preferencesRepository.logUploadWebhookUrl) { state, url ->
+        state.copy(logUploadWebhookUrl = url.orEmpty())
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
     private val _aemetSearch = MutableStateFlow(AemetSearchState())
@@ -111,6 +117,14 @@ class SettingsViewModel(
 
     fun onNewsAutoRefreshChange(enabled: Boolean) {
         viewModelScope.launch { container.preferencesRepository.setNewsAutoRefreshEnabled(enabled) }
+    }
+
+    fun onPresetSourceToggle(id: String, enabled: Boolean) {
+        viewModelScope.launch { container.preferencesRepository.setPresetNewsSourceEnabled(id, enabled) }
+    }
+
+    fun onLogUploadWebhookSave(url: String) {
+        viewModelScope.launch { container.preferencesRepository.setLogUploadWebhookUrl(url) }
     }
 
     fun onRemoteUrlChange(url: String) {

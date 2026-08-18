@@ -10,6 +10,7 @@ import com.miradio.app.domain.model.NewsArticle
 import com.miradio.app.domain.model.NewsCategory
 import com.miradio.app.domain.model.NewsSource
 import com.miradio.app.domain.model.PlaybackStatus
+import com.miradio.app.domain.model.PresetNewsSources
 import com.miradio.app.domain.model.PlayerUiState
 import com.miradio.app.domain.model.RadioStation
 import com.miradio.app.domain.model.StationSource
@@ -63,6 +64,7 @@ class NewsViewModel(
 ) : AndroidViewModel(application) {
 
     private val customSources = MutableStateFlow<List<NewsSource>>(emptyList())
+    private val enabledPresets = MutableStateFlow<List<NewsSource>>(emptyList())
     private val selectedSource = MutableStateFlow(COPE_SOURCES.first())
     private val articlesState = MutableStateFlow<Pair<List<NewsArticle>, String?>>(emptyList<NewsArticle>() to null)
     private val isLoading = MutableStateFlow(false)
@@ -76,13 +78,14 @@ class NewsViewModel(
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<NewsUiState> = combine(
         customSources,
+        enabledPresets,
         selectedSource,
         articlesState,
         isLoading,
-    ) { custom, selected, articlesAndError, loading ->
+    ) { custom, presets, selected, articlesAndError, loading ->
         val (articles, error) = articlesAndError
         NewsUiState(
-            sources = COPE_SOURCES + custom,
+            sources = COPE_SOURCES + presets + custom,
             selectedSource = selected,
             articles = articles,
             isLoading = loading,
@@ -101,22 +104,35 @@ class NewsViewModel(
                 customSources.value = custom.map { NewsSource.fromCustom(it) }
             }
         }
-        load(COPE_SOURCES.first())
         viewModelScope.launch {
-            container.newsRepository.fetchLatestBulletin()
-                .onSuccess { bulletinState.value = it }
-                .onFailure { bulletinState.value = null }
-            isBulletinLoading.value = false
+            container.preferencesRepository.enabledPresetNewsSources.collect { enabledIds ->
+                enabledPresets.value = PresetNewsSources.all.filter { it.id in enabledIds }
+            }
         }
+        load(COPE_SOURCES.first())
+        loadBulletin()
         // Refresco automático mientras se tiene Noticias abierta, para no
         // depender de que alguien se acuerde de tirar hacia abajo a mano.
+        // Incluye el boletín: antes solo se pedía una vez al abrir la
+        // pantalla y se quedaba fijo en el mismo episodio para siempre
+        // (reportado: "el último boletín siempre es el mismo").
         viewModelScope.launch {
             while (true) {
                 delay(AUTO_REFRESH_INTERVAL_MS)
                 if (container.preferencesRepository.newsAutoRefreshEnabled.first()) {
                     load(selectedSource.value, forceReload = true)
+                    loadBulletin()
                 }
             }
+        }
+    }
+
+    private fun loadBulletin() {
+        viewModelScope.launch {
+            container.newsRepository.fetchLatestBulletin()
+                .onSuccess { bulletinState.value = it }
+                .onFailure { bulletinState.value = null }
+            isBulletinLoading.value = false
         }
     }
 
@@ -125,7 +141,10 @@ class NewsViewModel(
         load(newSource)
     }
 
-    fun refresh() = load(selectedSource.value, forceReload = true)
+    fun refresh() {
+        load(selectedSource.value, forceReload = true)
+        loadBulletin()
+    }
 
     private val _addSourceState = MutableStateFlow<AddSourceState>(AddSourceState.Idle)
     val addSourceState: StateFlow<AddSourceState> = _addSourceState

@@ -34,3 +34,21 @@ data class NewsSource(
             NewsSource(id = custom.id, label = custom.name, feedUrl = custom.feedUrl, isCustom = true)
     }
 }
+
+/**
+ * Medios conocidos que se pueden activar con un interruptor en Ajustes >
+ * Noticias, sin tener que teclear su URL de RSS a mano. Desactivados por
+ * defecto: cada cual elige qué medios quiere ver, además de COPE.
+ *
+ * OJO: las URL de RSS de un medio pueden cambiar con el tiempo sin aviso;
+ * si alguna deja de funcionar, se ve como "no se han podido cargar las
+ * noticias de X" (fallo normal ya contemplado), sin afectar al resto.
+ */
+object PresetNewsSources {
+    val all: List<NewsSource> = listOf(
+        NewsSource(id = "preset_elmundo", label = "El Mundo", feedUrl = "https://e00-elmundo.uecdn.es/elmundo/rss/portada.xml"),
+        NewsSource(id = "preset_abc", label = "ABC", feedUrl = "https://www.abc.es/rss/feeds/abcPortada.xml"),
+        NewsSource(id = "preset_larazon", label = "La Razón", feedUrl = "https://www.larazon.es/rss/portada.xml"),
+        NewsSource(id = "preset_okdiario", label = "OKDiario", feedUrl = "https://okdiario.com/feed"),
+    )
+}

@@ -140,17 +140,29 @@ class MainActivity : FragmentActivity() {
 /**
  * No hay servidor detrás de esta app, así que no existe un "enviar el
  * registro solo" de verdad sin construir una infraestructura que no hay.
- * Esto es lo más parecido y honesto: si la app se cerró de golpe hace
- * poco, se ofrece compartir el registro nada más volver a abrirla, en vez
- * de esperar a que alguien se acuerde de ir a Ajustes por su cuenta.
+ * Si en Ajustes > Diagnóstico se ha puesto una URL propia (un webhook, un
+ * servidor personal), se sube el registro solo, sin tocar nada, en cuanto
+ * se detecta que la app se cerró de golpe. Sin esa URL configurada, se
+ * ofrece compartirlo a mano nada más volver a abrir la app, que sigue
+ * siendo mucho más rápido que ir a buscarlo a Ajustes por su cuenta.
  */
 @Composable
 private fun CrashReportPrompt() {
     val context = LocalContext.current
+    val container = (context.applicationContext as RadioApp).container
     var showPrompt by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        showPrompt = withContext(Dispatchers.IO) { DiagnosticsLog.hadRecentCrash(context) }
+        val hadCrash = withContext(Dispatchers.IO) { DiagnosticsLog.hadRecentCrash(context) }
+        if (!hadCrash) return@LaunchedEffect
+        val webhookUrl = container.preferencesRepository.logUploadWebhookUrl.first()
+        if (webhookUrl != null) {
+            DiagnosticsLog.uploadLog(context, webhookUrl)
+                .onSuccess { Toast.makeText(context, "Registro subido automáticamente tras el cierre", Toast.LENGTH_SHORT).show() }
+                .onFailure { Toast.makeText(context, "No se ha podido subir el registro automáticamente", Toast.LENGTH_SHORT).show() }
+        } else {
+            showPrompt = true
+        }
     }
 
     if (showPrompt) {

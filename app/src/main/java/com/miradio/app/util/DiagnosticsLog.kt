@@ -4,11 +4,18 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import androidx.core.content.FileProvider
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
 import java.text.SimpleDateFormat
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 /**
  * Registro de diagnóstico muy simple, en un archivo de texto dentro del
@@ -93,6 +100,30 @@ object DiagnosticsLog {
      * sea) con el registro ya adjunto, en un solo toque en vez de copiar y
      * pegar a mano.
      */
+    private val uploadClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .writeTimeout(15, TimeUnit.SECONDS)
+            .build()
+    }
+
+    /**
+     * Sube el registro entero, tal cual, con un POST de texto plano a una
+     * URL que cada usuario configura por su cuenta en Ajustes > Diagnóstico
+     * (un servidor o webhook propio: aquí no hay ninguno nuestro al que
+     * mandarlo). Sirve para no depender de abrir el selector de compartir a
+     * mano cada vez que la app se cierra sola.
+     */
+    suspend fun uploadLog(context: Context, url: String): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val body = readAll(context).toRequestBody("text/plain; charset=utf-8".toMediaType())
+            val request = Request.Builder().url(url).post(body).build()
+            uploadClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) throw java.io.IOException("HTTP ${response.code}")
+            }
+        }.onFailure { logThrowable(context, "DiagnosticsLog", "uploadLog falló", it) }
+    }
+
     fun shareIntent(context: Context): Intent {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", logFile(context))
         return Intent(Intent.ACTION_SEND).apply {

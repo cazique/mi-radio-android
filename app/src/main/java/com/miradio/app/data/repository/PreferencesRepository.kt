@@ -47,6 +47,8 @@ class PreferencesRepository(private val context: Context) {
         val AEMET_API_KEY = stringPreferencesKey("aemet_api_key")
         val AEMET_MUNICIPIO_ID = stringPreferencesKey("aemet_municipio_id")
         val AEMET_MUNICIPIO_NAME = stringPreferencesKey("aemet_municipio_name")
+        val ENABLED_PRESET_NEWS_SOURCES = stringPreferencesKey("enabled_preset_news_sources")
+        val LOG_UPLOAD_WEBHOOK_URL = stringPreferencesKey("log_upload_webhook_url")
     }
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -102,9 +104,10 @@ class PreferencesRepository(private val context: Context) {
     val hideAddButton: Flow<Boolean> = context.dataStore.data.map { it[Keys.HIDE_ADD_BUTTON] ?: false }
 
     /** Colores del sistema (Material You, Android 12+) en vez de la paleta de
-     *  marca. Desactivado por defecto para mantener el azul/naranja/crema
-     *  propios de Radio Dari. */
-    val dynamicColorEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.DYNAMIC_COLOR] ?: false }
+     *  marca. Activado por defecto (a partir de Android 12; en versiones
+     *  anteriores no hay color dinámico del sistema y se usa igualmente la
+     *  paleta propia). */
+    val dynamicColorEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.DYNAMIC_COLOR] ?: true }
 
     /** id de la última entrada del historial de cambios ([com.miradio.app.util.Changelog])
      *  que el usuario ya ha visto, para saber si hay novedades que enseñarle
@@ -135,6 +138,21 @@ class PreferencesRepository(private val context: Context) {
         val id = prefs[Keys.AEMET_MUNICIPIO_ID]
         val name = prefs[Keys.AEMET_MUNICIPIO_NAME]
         if (id != null && name != null) id to name else null
+    }
+
+    /** IDs de [com.miradio.app.domain.model.PresetNewsSources] que el
+     *  usuario ha activado (además de COPE). Vacío por defecto: cada cual
+     *  elige qué medios añadir. */
+    val enabledPresetNewsSources: Flow<Set<String>> = context.dataStore.data.map { prefs ->
+        prefs[Keys.ENABLED_PRESET_NEWS_SOURCES]?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+    }
+
+    /** URL propia (webhook, servidor personal...) a la que subir el
+     *  registro automáticamente tras un cierre inesperado, sin tener que
+     *  abrir el selector de compartir a mano. Null = sin configurar, se
+     *  sigue ofreciendo solo el botón manual de compartir. */
+    val logUploadWebhookUrl: Flow<String?> = context.dataStore.data.map {
+        it[Keys.LOG_UPLOAD_WEBHOOK_URL]?.takeIf { url -> url.isNotBlank() }
     }
 
     suspend fun setLastStation(id: String) {
@@ -216,6 +234,18 @@ class PreferencesRepository(private val context: Context) {
             it[Keys.AEMET_MUNICIPIO_ID] = id
             it[Keys.AEMET_MUNICIPIO_NAME] = name
         }
+    }
+
+    suspend fun setPresetNewsSourceEnabled(id: String, enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            val current = prefs[Keys.ENABLED_PRESET_NEWS_SOURCES]?.split(",")?.filter { it.isNotBlank() }?.toMutableSet() ?: mutableSetOf()
+            if (enabled) current.add(id) else current.remove(id)
+            prefs[Keys.ENABLED_PRESET_NEWS_SOURCES] = current.joinToString(",")
+        }
+    }
+
+    suspend fun setLogUploadWebhookUrl(url: String) {
+        context.dataStore.edit { it[Keys.LOG_UPLOAD_WEBHOOK_URL] = url.trim() }
     }
 
     suspend fun addCustomNewsSource(name: String, feedUrl: String) {
