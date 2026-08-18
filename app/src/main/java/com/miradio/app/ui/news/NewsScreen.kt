@@ -393,7 +393,15 @@ private fun NewsDetailDialog(article: NewsArticle, sourceLabel: String, onDismis
         }
     }
 
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        // decorFitsSystemWindows = false: sin esto la ventana propia del
+        // Dialog no se extiende bajo la barra de gestos y navigationBarsPadding()
+        // de más abajo no tiene ningún hueco real que respetar, así que el
+        // botón de "Leer completa" queda pegado (y la línea de gestos lo
+        // atraviesa) en vez de quedar por encima, limpio.
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
         Scaffold(
             topBar = {
                 TopAppBar(
