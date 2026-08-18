@@ -9,9 +9,13 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.miradio.app.BuildConfig
+import com.miradio.app.domain.model.CustomNewsSource
 import com.miradio.app.domain.model.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 private val Context.dataStore by preferencesDataStore(name = "miradio_prefs")
 
@@ -37,7 +41,12 @@ class PreferencesRepository(private val context: Context) {
         val SIMPLE_MODE = booleanPreferencesKey("simple_mode")
         val HIDE_ADD_BUTTON = booleanPreferencesKey("hide_add_button")
         val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
+        val LAST_SEEN_CHANGELOG_ID = intPreferencesKey("last_seen_changelog_id")
+        val CUSTOM_NEWS_SOURCES = stringPreferencesKey("custom_news_sources")
+        val NEWS_AUTO_REFRESH = booleanPreferencesKey("news_auto_refresh")
     }
+
+    private val json = Json { ignoreUnknownKeys = true }
 
     val lastStationId: Flow<String?> =
         context.dataStore.data.map { it[Keys.LAST_STATION_ID] }
@@ -94,6 +103,23 @@ class PreferencesRepository(private val context: Context) {
      *  propios de Radio Dari. */
     val dynamicColorEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.DYNAMIC_COLOR] ?: false }
 
+    /** id de la última entrada del historial de cambios ([com.miradio.app.util.Changelog])
+     *  que el usuario ya ha visto, para saber si hay novedades que enseñarle
+     *  al abrir la app tras una actualización. */
+    val lastSeenChangelogId: Flow<Int> = context.dataStore.data.map { it[Keys.LAST_SEEN_CHANGELOG_ID] ?: 0 }
+
+    /** Fuentes RSS propias añadidas en Ajustes > Noticias, además de las
+     *  secciones fijas de COPE. */
+    val customNewsSources: Flow<List<CustomNewsSource>> = context.dataStore.data.map { prefs ->
+        val raw = prefs[Keys.CUSTOM_NEWS_SOURCES] ?: return@map emptyList()
+        runCatching { json.decodeFromString<List<CustomNewsSource>>(raw) }.getOrDefault(emptyList())
+    }
+
+    /** Si está activo, Noticias se refresca sola de vez en cuando mientras
+     *  se tiene esa pantalla abierta, sin tener que tirar hacia abajo a
+     *  mano. Activado por defecto. */
+    val newsAutoRefreshEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.NEWS_AUTO_REFRESH] ?: true }
+
     suspend fun setLastStation(id: String) {
         context.dataStore.edit { it[Keys.LAST_STATION_ID] = id }
     }
@@ -146,6 +172,33 @@ class PreferencesRepository(private val context: Context) {
 
     suspend fun setDynamicColorEnabled(enabled: Boolean) {
         context.dataStore.edit { it[Keys.DYNAMIC_COLOR] = enabled }
+    }
+
+    suspend fun setLastSeenChangelogId(id: Int) {
+        context.dataStore.edit { it[Keys.LAST_SEEN_CHANGELOG_ID] = id }
+    }
+
+    suspend fun setNewsAutoRefreshEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.NEWS_AUTO_REFRESH] = enabled }
+    }
+
+    suspend fun addCustomNewsSource(name: String, feedUrl: String) {
+        context.dataStore.edit { prefs ->
+            val current = prefs[Keys.CUSTOM_NEWS_SOURCES]
+                ?.let { runCatching { json.decodeFromString<List<CustomNewsSource>>(it) }.getOrDefault(emptyList()) }
+                ?: emptyList()
+            val updated = current + CustomNewsSource(id = "custom_${System.currentTimeMillis()}", name = name, feedUrl = feedUrl)
+            prefs[Keys.CUSTOM_NEWS_SOURCES] = json.encodeToString(updated)
+        }
+    }
+
+    suspend fun removeCustomNewsSource(id: String) {
+        context.dataStore.edit { prefs ->
+            val current = prefs[Keys.CUSTOM_NEWS_SOURCES]
+                ?.let { runCatching { json.decodeFromString<List<CustomNewsSource>>(it) }.getOrDefault(emptyList()) }
+                ?: emptyList()
+            prefs[Keys.CUSTOM_NEWS_SOURCES] = json.encodeToString(current.filterNot { it.id == id })
+        }
     }
 
     /** Añade [id] al principio del historial de "últimas escuchadas",

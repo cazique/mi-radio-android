@@ -13,7 +13,11 @@ import com.miradio.app.domain.usecase.ToggleFavoriteUseCase
 import com.miradio.app.domain.usecase.UpdateStationUseCase
 import com.miradio.app.domain.usecase.ValidateStreamUrlUseCase
 import com.miradio.app.util.DiagnosticsLog
+import com.miradio.app.util.UpdateChecker
 import com.miradio.app.util.WeatherService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
 /**
  * Contenedor manual de dependencias. Con el tamaño de esta app no hace
@@ -44,10 +48,16 @@ class RadioApp : Application() {
     lateinit var container: AppContainer
         private set
 
+    // Vive mientras dura el proceso: sirve para comprobaciones que deben
+    // seguir corriendo aunque la Activity se recree (giro de pantalla) o el
+    // usuario navegue entre pantallas, como el aviso de actualización.
+    private val appScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+
     override fun onCreate() {
         super.onCreate()
         DiagnosticsLog.installUncaughtExceptionLogger(this)
         DiagnosticsLog.log(this, "App", "onCreate versión ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
         container = AppContainer(this)
+        UpdateChecker.start(this, appScope)
     }
 }

@@ -3,6 +3,7 @@ package com.miradio.app.ui.news
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Pause
@@ -31,6 +34,7 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.TextDecrease
 import androidx.compose.material.icons.filled.TextIncrease
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -44,6 +48,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -68,17 +73,17 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.miradio.app.domain.model.NewsArticle
-import com.miradio.app.domain.model.NewsCategory
 import com.miradio.app.util.NewsTts
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 /**
- * Pestaña de Noticias: RSS público de COPE por secciones, mostrado a lo
- * grande (foto + titular bien visible, como el feed de noticias del móvil),
- * sin nada de la publicidad de su web porque solo se lee y se pinta el
- * contenido del RSS, nunca la página completa.
+ * Pestaña de Noticias: secciones RSS de COPE más cualquier fuente propia
+ * que se añada ("Añadir" al final de las pestañas), mostrado a lo grande
+ * (foto + titular bien visible, como el feed de noticias del móvil), sin
+ * nada de publicidad porque solo se lee y se pinta el contenido del RSS,
+ * nunca la página completa.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,11 +93,12 @@ fun NewsScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     var selectedArticle by remember { mutableStateOf<NewsArticle?>(null) }
+    var showAddSourceDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Noticias COPE") },
+                title = { Text("Noticias") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
@@ -114,15 +120,36 @@ fun NewsScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
             ) {
-                items(NewsCategory.entries) { category ->
+                items(state.sources, key = { it.id }) { source ->
                     FilterChip(
-                        selected = category == state.category,
-                        onClick = { viewModel.onCategorySelect(category) },
-                        label = { Text(category.label) },
+                        selected = source == state.selectedSource,
+                        onClick = { viewModel.onSourceSelect(source) },
+                        label = { Text(source.label) },
+                        trailingIcon = if (source.isCustom) {
+                            {
+                                Icon(
+                                    Icons.Filled.Close,
+                                    contentDescription = "Quitar ${source.label}",
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .clickable { viewModel.removeCustomSource(source) },
+                                )
+                            }
+                        } else {
+                            null
+                        },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = MaterialTheme.colorScheme.primary,
                             selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
                         ),
+                    )
+                }
+                item {
+                    FilterChip(
+                        selected = false,
+                        onClick = { showAddSourceDialog = true },
+                        label = { Text("Añadir") },
+                        leadingIcon = { Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp)) },
                     )
                 }
             }
@@ -143,7 +170,7 @@ fun NewsScreen(
                 }
                 state.articles.isEmpty() -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
-                        text = "No hay noticias en esta categoría ahora mismo.",
+                        text = "No hay noticias en esta fuente ahora mismo.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -163,6 +190,101 @@ fun NewsScreen(
     selectedArticle?.let { article ->
         NewsDetailDialog(article = article, onDismiss = { selectedArticle = null })
     }
+
+    if (showAddSourceDialog) {
+        val addState by viewModel.addSourceState.collectAsState()
+        var hasSubmitted by remember { mutableStateOf(false) }
+        // Se cierra sola en cuanto la comprobación termina bien: solo si ya
+        // se había enviado el formulario (hasSubmitted), para no confundir
+        // el Idle inicial (antes de tocar "Añadir") con un éxito.
+        LaunchedEffect(addState, hasSubmitted) {
+            if (hasSubmitted && addState == AddSourceState.Idle) {
+                showAddSourceDialog = false
+                hasSubmitted = false
+            }
+        }
+        AddNewsSourceDialog(
+            addState = addState,
+            onDismiss = {
+                showAddSourceDialog = false
+                hasSubmitted = false
+                viewModel.clearAddSourceError()
+            },
+            onConfirm = { name, url ->
+                hasSubmitted = true
+                viewModel.addCustomSource(name, url)
+            },
+        )
+    }
+}
+
+/**
+ * Diálogo para añadir una fuente RSS propia (El Mundo, ABC, La Razón, el
+ * periódico de tu provincia...). Comprueba el feed antes de guardarlo, para
+ * no dejar guardada una URL que en realidad no funciona.
+ */
+@Composable
+private fun AddNewsSourceDialog(
+    addState: AddSourceState,
+    onDismiss: () -> Unit,
+    onConfirm: (name: String, url: String) -> Unit,
+) {
+    var name by remember { mutableStateOf("") }
+    var url by remember { mutableStateOf("") }
+    val checking = addState is AddSourceState.Checking
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Añadir fuente de noticias") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Añade el feed RSS de cualquier medio (por ejemplo, El Mundo, ABC o La Razón, " +
+                        "o el periódico de tu provincia).",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Nombre") },
+                    singleLine = true,
+                    enabled = !checking,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = url,
+                    onValueChange = { url = it },
+                    label = { Text("URL del feed RSS") },
+                    singleLine = true,
+                    enabled = !checking,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (checking) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Text("Comprobando…", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                if (addState is AddSourceState.Error) {
+                    Text(
+                        text = addState.message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(name.trim().ifBlank { url.trim() }, url.trim()) },
+                enabled = !checking && name.isNotBlank() && url.isNotBlank(),
+            ) { Text("Añadir") }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss, enabled = !checking) { Text("Cancelar") }
+        },
+    )
 }
 
 /**

@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -69,6 +70,8 @@ import com.miradio.app.ui.components.PlayerCard
 import com.miradio.app.ui.components.RecentStationChip
 import com.miradio.app.ui.components.StationLogo
 import com.miradio.app.ui.components.WeatherCard
+import com.miradio.app.util.AppUpdater
+import com.miradio.app.util.UpdateChecker
 
 /**
  * Pantalla de Inicio curada: "ahora suena", últimas escuchadas y accesos
@@ -137,6 +140,7 @@ fun HomeLandingScreen(
                 .verticalScroll(rememberScrollState()),
         ) {
             NotificationPermissionBanner()
+            UpdateAvailableBanner()
 
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 DeviceIndicator(
@@ -314,6 +318,59 @@ private fun NotificationPermissionBanner() {
                 IconButton(onClick = { dismissed = true }) {
                     Icon(Icons.Filled.Close, contentDescription = "Cerrar aviso", tint = MaterialTheme.colorScheme.onErrorContainer)
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Aviso de que hay una versión más reciente instalable, sin que haga falta
+ * ir a Ajustes > Buscar actualizaciones a mano: UpdateChecker comprueba
+ * solo, en segundo plano, mientras la app está abierta.
+ */
+@Composable
+private fun UpdateAvailableBanner() {
+    val context = LocalContext.current
+    val update by UpdateChecker.updateAvailable.collectAsState()
+    val current = update ?: return
+
+    Surface(
+        color = MaterialTheme.colorScheme.primaryContainer,
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Filled.SystemUpdate,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                Text(
+                    text = "Hay una versión nueva",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+                current.versionName?.let { versionName ->
+                    Text(
+                        text = "Versión $versionName disponible para instalar.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+                TextButton(
+                    onClick = {
+                        AppUpdater.installUpdate(context, current.apkFile)
+                        UpdateChecker.dismiss()
+                    },
+                    modifier = Modifier.padding(top = 4.dp),
+                ) { Text("Instalar ahora") }
+            }
+            IconButton(onClick = { UpdateChecker.dismiss() }) {
+                Icon(Icons.Filled.Close, contentDescription = "Cerrar aviso", tint = MaterialTheme.colorScheme.onPrimaryContainer)
             }
         }
     }

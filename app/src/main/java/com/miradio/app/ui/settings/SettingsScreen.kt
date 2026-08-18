@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Palette
@@ -174,6 +175,13 @@ fun SettingsScreen(
                             color = if (state.syncFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                         )
                     }
+                }
+
+                HorizontalDivider()
+
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SectionHeader(Icons.Filled.Newspaper, SectionPurple, "Noticias")
+                    NewsAutoRefreshSection(enabled = state.newsAutoRefresh, onEnabledChange = viewModel::onNewsAutoRefreshChange)
                 }
             }
 
@@ -379,31 +387,59 @@ private fun UpdateSection() {
 }
 
 /**
- * No hay una pantalla de "novedades de esta versión" dentro de la app (no
- * hay dónde guardar ese texto sin inventarlo), pero sí existe de verdad en
- * GitHub: cada compilación publicada queda como una entrada con sus commits.
- * Un enlace directo ahí es más honesto que un changelog redactado a mano
- * que se quedaría desactualizado.
+ * Historial de cambios en español sencillo (ver [com.miradio.app.util.Changelog]):
+ * qué ha cambiado para quien usa la app, no una lista de commits técnicos.
+ * Se mantiene a mano (una entrada por cada cambio que de verdad se nota),
+ * así que hay que acordarse de añadir una entrada nueva cuando toque.
  */
 @Composable
 private fun ChangelogSection() {
-    val context = LocalContext.current
+    var showDialog by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Historial de cambios", style = MaterialTheme.typography.titleMedium)
         Text(
-            text = "Ver qué ha cambiado en cada versión publicada.",
+            text = "Ver qué ha cambiado en cada versión, explicado sin tecnicismos.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        OutlinedButton(onClick = {
-            context.startActivity(
-                Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/cazique/mi-radio-android/commits/main")),
-            )
-        }) {
+        OutlinedButton(onClick = { showDialog = true }) {
             Icon(Icons.Filled.History, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
             Text("Ver historial de cambios")
         }
     }
+    if (showDialog) {
+        ChangelogDialog(onDismiss = { showDialog = false })
+    }
+}
+
+@Composable
+fun ChangelogDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Novedades") },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                com.miradio.app.util.Changelog.entries.forEach { entry ->
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(entry.title, style = MaterialTheme.typography.titleSmall)
+                        entry.bullets.forEach { bullet ->
+                            Text(
+                                text = "•  $bullet",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDismiss) { Text("Cerrar") }
+        },
+    )
 }
 
 /**
@@ -520,6 +556,30 @@ private fun SimpleModeSection(enabled: Boolean, onEnabledChange: (Boolean) -> Un
                     "Reproducir/Pausa enorme. Se ocultan Explorar, Añadir emisora y el catálogo " +
                     "remoto. Ideal para dejar la app lista para alguien que solo quiere poner " +
                     "su emisora sin liarse con el resto.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = enabled, onCheckedChange = onEnabledChange)
+    }
+}
+
+/**
+ * Con esto activo, la pestaña Noticias se refresca sola de vez en cuando
+ * mientras se tiene abierta, sin tener que tirar hacia abajo a mano cada
+ * vez para ver si hay algo nuevo.
+ */
+@Composable
+private fun NewsAutoRefreshSection(enabled: Boolean, onEnabledChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+            Text("Actualizar noticias automáticamente", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "Refresca la pestaña Noticias sola de vez en cuando mientras la tienes abierta.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -23,6 +23,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -42,7 +43,9 @@ import com.miradio.app.ui.navigation.RadioBottomBar
 import com.miradio.app.ui.navigation.RadioNavHost
 import com.miradio.app.ui.navigation.Routes
 import com.miradio.app.ui.navigation.bottomBarRoutes
+import com.miradio.app.ui.settings.ChangelogDialog
 import com.miradio.app.ui.theme.MiRadioTheme
+import com.miradio.app.util.Changelog
 import com.miradio.app.util.DiagnosticsLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -88,6 +91,7 @@ class MainActivity : FragmentActivity() {
                 ) {
                     MiRadioApp(simpleMode = simpleMode)
                     CrashReportPrompt()
+                    WhatsNewPrompt()
                 }
             }
         }
@@ -169,6 +173,33 @@ private fun CrashReportPrompt() {
             },
             dismissButton = {
                 TextButton(onClick = { showPrompt = false }) { Text("No, gracias") }
+            },
+        )
+    }
+}
+
+/**
+ * Muestra el historial de cambios humano (ver [Changelog]) una sola vez,
+ * justo tras actualizar a una versión con entradas nuevas, en vez de que el
+ * usuario tenga que acordarse de ir a buscarlo a Ajustes por su cuenta.
+ */
+@Composable
+private fun WhatsNewPrompt() {
+    val context = LocalContext.current
+    val container = (context.applicationContext as RadioApp).container
+    val scope = rememberCoroutineScope()
+    var showDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        val lastSeen = container.preferencesRepository.lastSeenChangelogId.first()
+        if (lastSeen < Changelog.latestId) showDialog = true
+    }
+
+    if (showDialog) {
+        ChangelogDialog(
+            onDismiss = {
+                showDialog = false
+                scope.launch { container.preferencesRepository.setLastSeenChangelogId(Changelog.latestId) }
             },
         )
     }

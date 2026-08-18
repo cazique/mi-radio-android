@@ -28,6 +28,7 @@ data class SettingsUiState(
     val simpleMode: Boolean = false,
     val hideAddButton: Boolean = false,
     val dynamicColor: Boolean = false,
+    val newsAutoRefresh: Boolean = true,
 )
 
 class SettingsViewModel(
@@ -63,6 +64,8 @@ class SettingsViewModel(
         state.copy(hideAddButton = hideAdd)
     }.combine(container.preferencesRepository.dynamicColorEnabled) { state, dynamic ->
         state.copy(dynamicColor = dynamic)
+    }.combine(container.preferencesRepository.newsAutoRefreshEnabled) { state, autoRefresh ->
+        state.copy(newsAutoRefresh = autoRefresh)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
     fun onThemeModeChange(mode: ThemeMode) {
@@ -87,6 +90,10 @@ class SettingsViewModel(
 
     fun onDynamicColorChange(enabled: Boolean) {
         viewModelScope.launch { container.preferencesRepository.setDynamicColorEnabled(enabled) }
+    }
+
+    fun onNewsAutoRefreshChange(enabled: Boolean) {
+        viewModelScope.launch { container.preferencesRepository.setNewsAutoRefreshEnabled(enabled) }
     }
 
     fun onRemoteUrlChange(url: String) {
