@@ -27,7 +27,19 @@ object DiagnosticsLog {
 
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
 
-    private fun logFile(context: Context): File = File(context.filesDir, FILE_NAME)
+    // OJO: el archivo vive en un subdirectorio propio ("diagnostics/"), no
+    // suelto en la raíz de filesDir. Con path="." en file_paths.xml (como
+    // estaba antes), FileProvider.getUriForFile() lanzaba
+    // StringIndexOutOfBoundsException al compartir el registro: al
+    // canonicalizar una raíz declarada como "." acaba coincidiendo
+    // exactamente con filesDir, y el cálculo interno de FileProvider
+    // (path.substring(rootPath.length() + 1)) se sale de rango porque no
+    // sobra ni un carácter para el nombre del archivo. Con un
+    // subdirectorio real (mismo patrón que "updates/" para el APK
+    // descargado, que nunca ha dado este problema) la raíz declarada
+    // siempre queda estrictamente más corta que la ruta del archivo.
+    private fun logFile(context: Context): File =
+        File(context.filesDir, "diagnostics").apply { mkdirs() }.let { File(it, FILE_NAME) }
 
     @Synchronized
     fun log(context: Context, tag: String, message: String, level: LogLevel = LogLevel.INFO) {
