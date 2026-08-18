@@ -257,10 +257,10 @@ class PlaybackService : MediaSessionService() {
                 // Sin esto, se repintaba el widget en cada uno de esos cambios,
                 // muchas veces por minuto sin necesidad.
                 radioPlayer.uiState
-                    .map { it.station?.name to it.status }
+                    .map { Triple(it.station?.name, it.status, it.station?.logoUrl) }
                     .distinctUntilChanged()
-                    .collect { (stationName, status) ->
-                        runCatching { RadioWidgetProvider.updateAll(this@PlaybackService, stationName, status) }
+                    .collect { (stationName, status, logoUrl) ->
+                        runCatching { RadioWidgetProvider.updateAll(this@PlaybackService, stationName, status, logoUrl) }
                             .onFailure { DiagnosticsLog.logThrowable(this@PlaybackService, "PlaybackService", "Fallo actualizando el widget", it) }
                     }
             }
