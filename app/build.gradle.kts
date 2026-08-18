@@ -134,7 +134,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3:1.3.1")
     implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.navigation:navigation-compose:2.8.4")
+    implementation("androidx.navigation:navigation-compose:2.8.5")
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     // Coil (logos de emisoras)
@@ -149,16 +149,17 @@ dependencies {
     implementation("com.google.android.material:material:1.12.0")
 
     // Media3 / ExoPlayer + sesión multimedia + Cast bridge
-    implementation("androidx.media3:media3-exoplayer:1.4.1")
-    implementation("androidx.media3:media3-exoplayer-hls:1.4.1")
-    implementation("androidx.media3:media3-session:1.4.1")
-    implementation("androidx.media3:media3-cast:1.4.1")
-    implementation("androidx.media3:media3-common:1.4.1")
-    implementation("androidx.media3:media3-datasource-okhttp:1.4.1")
+    val media3Version = "1.5.1"
+    implementation("androidx.media3:media3-exoplayer:$media3Version")
+    implementation("androidx.media3:media3-exoplayer-hls:$media3Version")
+    implementation("androidx.media3:media3-session:$media3Version")
+    implementation("androidx.media3:media3-cast:$media3Version")
+    implementation("androidx.media3:media3-common:$media3Version")
+    implementation("androidx.media3:media3-datasource-okhttp:$media3Version")
     // Declarado explícito (aunque media3-exoplayer ya lo trae de forma
     // transitiva) porque RadioPlayer usa directamente IcyInfo de aquí para
     // leer los metadatos "ahora suena" (título) que mandan Icecast/Shoutcast.
-    implementation("androidx.media3:media3-extractor:1.4.1")
+    implementation("androidx.media3:media3-extractor:$media3Version")
 
     // Google Cast
     implementation("com.google.android.gms:play-services-cast-framework:21.5.0")

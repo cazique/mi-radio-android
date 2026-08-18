@@ -7,16 +7,15 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
@@ -66,14 +65,8 @@ fun PlayerCard(
     onVolumeChange: ((Float) -> Unit)? = null,
 ) {
     val shape = RoundedCornerShape(28.dp)
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .let { if (onCardClick != null) it.clickable(onClick = onCardClick) else it },
-        shape = shape,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-    ) {
+    val colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    val content: @Composable ColumnScope.() -> Unit = {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -166,6 +159,22 @@ fun PlayerCard(
                 }
             }
         }
+    }
+    if (onCardClick != null) {
+        Card(
+            onClick = onCardClick,
+            modifier = modifier.fillMaxWidth(),
+            shape = shape,
+            colors = colors,
+            content = content,
+        )
+    } else {
+        Card(
+            modifier = modifier.fillMaxWidth(),
+            shape = shape,
+            colors = colors,
+            content = content,
+        )
     }
 }
 

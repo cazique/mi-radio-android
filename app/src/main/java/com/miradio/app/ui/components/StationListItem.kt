@@ -66,7 +66,7 @@ fun StationListItem(
                     modifier = Modifier.size(14.dp),
                 )
                 Text(
-                    text = if (station.isAvailable) station.city else "${station.city} · no disponible",
+                    text = if (station.isAvailable) station.city else stringResource(R.string.station_city_unavailable, station.city),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,

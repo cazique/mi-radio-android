@@ -27,7 +27,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,23 +34,30 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.miradio.app.domain.model.PlaybackStatus
 import com.miradio.app.domain.model.PlayerUiState
-import com.miradio.app.playback.PlaybackServiceConnector
-import kotlinx.coroutines.flow.MutableStateFlow
+import com.miradio.app.domain.model.RadioStation
 
 /**
  * Franja de "ahora suena" fija encima de la barra de navegación, visible
  * desde Inicio/Favoritos/Explorar/Ajustes (igual que Spotify o YouTube
  * Music): permite pausar o abrir el reproductor completo sin tener que
  * volver a Inicio. No se muestra si todavía no ha sonado nada en esta sesión.
+ *
+ * Sin estado propio (hoisted): quien la usa (MainActivity) es responsable
+ * de observar PlaybackServiceConnector y pasarle el [uiState] ya resuelto,
+ * en vez de que este composable tenga que saber nada de esa conexión. Así
+ * se puede previsualizar y probar sin necesitar un RadioPlayer real.
  */
 @Composable
-fun MiniPlayerBar(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val radioPlayer by PlaybackServiceConnector.player.collectAsState()
-    val emptyState = remember { MutableStateFlow(PlayerUiState()) }
-    val uiState by (radioPlayer?.uiState ?: emptyState).collectAsState()
+fun MiniPlayerBar(
+    uiState: PlayerUiState,
+    onTogglePlayPause: () -> Unit,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val station = uiState.station ?: return
 
     // Solo se anima la primera vez que aparece en esta composición (p. ej.
@@ -97,8 +103,7 @@ fun MiniPlayerBar(onClick: () -> Unit, modifier: Modifier = Modifier) {
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            val isActive = uiState.status == PlaybackStatus.PLAYING || uiState.status == PlaybackStatus.BUFFERING
-            IconButton(onClick = { if (isActive) radioPlayer?.pause() else radioPlayer?.play() }) {
+            IconButton(onClick = onTogglePlayPause) {
                 AnimatedContent(
                     targetState = uiState.status,
                     transitionSpec = {
@@ -120,4 +125,26 @@ fun MiniPlayerBar(onClick: () -> Unit, modifier: Modifier = Modifier) {
         }
     }
     }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun MiniPlayerBarPreview() {
+    MiniPlayerBar(
+        uiState = PlayerUiState(
+            station = RadioStation(
+                id = "preview",
+                name = "COPE Madrid",
+                city = "Madrid",
+                streamUrl = "",
+                logoUrl = null,
+                description = null,
+                category = null,
+                isFavorite = false,
+            ),
+            status = PlaybackStatus.PLAYING,
+        ),
+        onTogglePlayPause = {},
+        onClick = {},
+    )
 }

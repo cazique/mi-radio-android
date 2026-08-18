@@ -33,7 +33,10 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.miradio.app.domain.model.PlaybackStatus
+import com.miradio.app.domain.model.PlayerUiState
 import com.miradio.app.playback.PlaybackController
+import com.miradio.app.playback.PlaybackServiceConnector
 import com.miradio.app.ui.components.MiniPlayerBar
 import com.miradio.app.ui.navigation.RadioBottomBar
 import com.miradio.app.ui.navigation.RadioNavHost
@@ -42,6 +45,7 @@ import com.miradio.app.ui.navigation.bottomBarRoutes
 import com.miradio.app.ui.theme.MiRadioTheme
 import com.miradio.app.util.DiagnosticsLog
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -177,6 +181,14 @@ private fun MiRadioApp(simpleMode: Boolean) {
     val currentRoute = backStackEntry?.destination?.route
     val showBottomBar = currentRoute == null || currentRoute in bottomBarRoutes
 
+    // MiniPlayerBar ya no lee PlaybackServiceConnector por su cuenta (estado
+    // "hoisted"): se observa aquí, en el único sitio donde vive, y se le
+    // pasa ya resuelto. radioPlayer es null hasta que el servicio arranca
+    // (p. ej. justo al abrir la app), de ahí el estado por defecto.
+    val radioPlayer by PlaybackServiceConnector.player.collectAsState()
+    val miniPlayerState by (radioPlayer?.uiState ?: remember { MutableStateFlow(PlayerUiState()) })
+        .collectAsState()
+
     Scaffold(
         bottomBar = {
             if (showBottomBar) {
@@ -184,7 +196,15 @@ private fun MiRadioApp(simpleMode: Boolean) {
                     // Franja de "ahora suena" fija encima de la barra de
                     // navegación, visible en Inicio/Favoritos/Explorar/Ajustes;
                     // se oculta ella sola si todavía no ha sonado nada.
-                    MiniPlayerBar(onClick = { navController.navigate(Routes.PLAYER) })
+                    MiniPlayerBar(
+                        uiState = miniPlayerState,
+                        onTogglePlayPause = {
+                            val isActive = miniPlayerState.status == PlaybackStatus.PLAYING ||
+                                miniPlayerState.status == PlaybackStatus.BUFFERING
+                            if (isActive) radioPlayer?.pause() else radioPlayer?.play()
+                        },
+                        onClick = { navController.navigate(Routes.PLAYER) },
+                    )
                     RadioBottomBar(navController, simpleMode = simpleMode)
                 }
             }
