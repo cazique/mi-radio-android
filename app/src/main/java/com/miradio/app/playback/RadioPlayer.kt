@@ -384,8 +384,19 @@ class RadioPlayer(
                 remaining -= 1
                 _uiState.update { it.copy(sleepTimerSecondsLeft = remaining) }
             }
-            pause()
-            _uiState.update { it.copy(sleepTimerSecondsLeft = null) }
+            // Importante: no usar pause() aquí. pause() solo pone
+            // playWhenReady a false y deja el búfer de ExoPlayer tal cual
+            // (STATE_READY); al volver a dar a play() más tarde, retomaba
+            // desde esa posición ya vieja en vez de saltar al directo actual
+            // (reportado: "cuando la das a play, continúa desde donde se
+            // quedó"). Con stop() el reproductor pasa a STATE_IDLE, así que
+            // play() (ver más abajo) detecta ese estado y llama a
+            // playStation() de nuevo, recargando el stream desde el directo.
+            DiagnosticsLog.log(context, "RadioPlayer", "Temporizador de apagado agotado, deteniendo")
+            retryJob?.cancel()
+            retryAttempt = 0
+            activePlayer.stop()
+            _uiState.update { it.copy(status = PlaybackStatus.STOPPED, sleepTimerSecondsLeft = null) }
         }
     }
 
