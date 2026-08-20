@@ -77,6 +77,7 @@ import coil.compose.AsyncImage
 import com.miradio.app.domain.model.NewsArticle
 import com.miradio.app.domain.model.NewsSource
 import com.miradio.app.util.NewsTts
+import com.miradio.app.util.parseRssPubDateMillis
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -581,16 +582,7 @@ private fun BulletinCard(
  *  relativo, más ambiguo pasadas unas horas. Si no se puede interpretar,
  *  no se muestra nada de fecha en vez de enseñar el texto en crudo. */
 private fun formatArticleDate(pubDate: String?): String? {
-    if (pubDate.isNullOrBlank()) return null
-    val patterns = listOf(
-        "EEE, dd MMM yyyy HH:mm:ss Z",
-        "EEE, dd MMM yyyy HH:mm:ss zzz",
-        "yyyy-MM-dd'T'HH:mm:ssXXX",
-        "yyyy-MM-dd'T'HH:mm:ss'Z'",
-    )
-    val parsedMillis = patterns.firstNotNullOfOrNull { pattern ->
-        runCatching { SimpleDateFormat(pattern, Locale.ENGLISH).parse(pubDate)?.time }.getOrNull()
-    } ?: return null
+    val parsedMillis = parseRssPubDateMillis(pubDate) ?: return null
     val diffMs = (System.currentTimeMillis() - parsedMillis).coerceAtLeast(0)
     // "ahora"/"hace X min" solo para lo muy reciente (más útil que una hora
     // exacta cuando acaba de publicarse); a partir de ahí, fecha y hora

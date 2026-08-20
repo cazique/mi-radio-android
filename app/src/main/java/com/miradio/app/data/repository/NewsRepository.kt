@@ -4,6 +4,7 @@ import android.content.Context
 import android.text.Html
 import com.miradio.app.domain.model.NewsArticle
 import com.miradio.app.util.DiagnosticsLog
+import com.miradio.app.util.parseRssPubDateMillis
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -42,9 +43,16 @@ class NewsRepository(private val context: Context) {
         }
     }
 
-    /** El primer elemento del feed de boletines es siempre el más reciente. */
+    /** No se fía del orden del feed (reportado: "el boletín siempre es el de
+     *  las 2 de la mañana", como si COPE publicara una lista de franjas fija
+     *  en vez de devolver siempre la más reciente primero): elige a mano el
+     *  elemento con la fecha de publicación más nueva. Si ningún elemento
+     *  trae una fecha que se pueda interpretar, se queda con el primero
+     *  como antes, en vez de fallar. */
     suspend fun fetchLatestBulletin(): Result<NewsArticle?> =
-        fetchFeed(BULLETIN_FEED_URL).map { it.firstOrNull() }
+        fetchFeed(BULLETIN_FEED_URL).map { articles ->
+            articles.maxByOrNull { parseRssPubDateMillis(it.pubDate) ?: Long.MIN_VALUE }
+        }
 
     private fun parseRss(xml: String, sourceId: String?): List<NewsArticle> {
         val articles = mutableListOf<NewsArticle>()
