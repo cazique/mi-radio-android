@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.TextDecrease
 import androidx.compose.material.icons.filled.TextIncrease
@@ -97,6 +98,7 @@ import java.util.concurrent.TimeUnit
 @Composable
 fun NewsScreen(
     onBack: () -> Unit,
+    onOpenSettings: () -> Unit,
     viewModel: NewsViewModel = viewModel(factory = NewsViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -110,6 +112,11 @@ fun NewsScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(Icons.Filled.Settings, contentDescription = "Ajustes")
                     }
                 },
             )

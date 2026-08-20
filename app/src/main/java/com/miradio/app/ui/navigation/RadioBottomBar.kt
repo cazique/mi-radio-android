@@ -6,7 +6,6 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Newspaper
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -27,17 +26,19 @@ private val tabs = listOf(
     BottomTab(Routes.EXPLORE, R.string.nav_explore, Icons.Filled.Explore),
     BottomTab(Routes.NEWS, R.string.nav_news, Icons.Filled.Newspaper),
     BottomTab(Routes.PODCASTS, R.string.nav_podcasts, Icons.Filled.Mic),
-    BottomTab(Routes.SETTINGS, R.string.nav_settings, Icons.Filled.Settings),
 )
 
-/** Solo se muestra en las pantallas de nivel superior (Inicio/Favoritos/Ajustes);
- *  la pantalla de reproducción y los formularios de emisora ocupan toda la pantalla. */
+/** Ajustes ya no vive aquí (a petición: solo se llega a él con el icono de
+ *  engranaje que ya tienen todas estas pantallas arriba); se comporta como
+ *  cualquier otra pantalla de detalle (Alarmas, editar emisora...), sin
+ *  barra inferior propia, solo con su flecha de volver. */
 val bottomBarRoutes = tabs.map { it.route }.toSet()
 
-/** Con el modo simple activo, la barra se reduce a Inicio/Ajustes: Favoritos
- *  y Explorar ya no son pestañas propias, Inicio pasa a ser el propio
- *  listado de favoritas en grande. */
-private val simpleModeTabs = tabs.filter { it.route == Routes.HOME || it.route == Routes.SETTINGS }
+/** Con el modo simple activo, la barra se reduce solo a Inicio: Favoritos y
+ *  Explorar ya no son pestañas propias (Inicio pasa a ser el propio listado
+ *  de favoritas en grande), y Ajustes se alcanza con su icono de arriba,
+ *  igual que en el modo normal. */
+private val simpleModeTabs = tabs.filter { it.route == Routes.HOME }
 
 @Composable
 fun RadioBottomBar(navController: NavHostController, simpleMode: Boolean = false) {

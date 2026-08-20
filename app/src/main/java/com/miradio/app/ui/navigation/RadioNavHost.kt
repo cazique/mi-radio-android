@@ -69,7 +69,10 @@ fun RadioNavHost(navController: NavHostController = rememberNavController()) {
             )
         }
         composable(Routes.NEWS) {
-            NewsScreen(onBack = { navController.popBackStack() })
+            NewsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+            )
         }
         composable(Routes.PLAYER) {
             PlayerScreen(onBack = { navController.popBackStack() })
