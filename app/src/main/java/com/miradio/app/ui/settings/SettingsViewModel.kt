@@ -10,6 +10,7 @@ import com.miradio.app.data.repository.CatalogSyncResult
 import com.miradio.app.domain.model.AemetMunicipio
 import com.miradio.app.domain.model.ThemeMode
 import com.miradio.app.ui.util.radioApp
+import com.miradio.app.util.BreakingNewsScheduler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +31,7 @@ data class SettingsUiState(
     val hideAddButton: Boolean = false,
     val dynamicColor: Boolean = false,
     val newsAutoRefresh: Boolean = true,
+    val breakingNewsAlerts: Boolean = false,
     val aemetApiKey: String = "",
     val aemetMunicipioName: String? = null,
     val enabledPresetSources: Set<String> = emptySet(),
@@ -77,6 +79,8 @@ class SettingsViewModel(
         state.copy(dynamicColor = dynamic)
     }.combine(container.preferencesRepository.newsAutoRefreshEnabled) { state, autoRefresh ->
         state.copy(newsAutoRefresh = autoRefresh)
+    }.combine(container.preferencesRepository.breakingNewsAlertsEnabled) { state, breakingAlerts ->
+        state.copy(breakingNewsAlerts = breakingAlerts)
     }.combine(container.preferencesRepository.aemetApiKey) { state, key ->
         state.copy(aemetApiKey = key.orEmpty())
     }.combine(container.preferencesRepository.aemetMunicipio) { state, municipio ->
@@ -117,6 +121,12 @@ class SettingsViewModel(
 
     fun onNewsAutoRefreshChange(enabled: Boolean) {
         viewModelScope.launch { container.preferencesRepository.setNewsAutoRefreshEnabled(enabled) }
+    }
+
+    fun onBreakingNewsAlertsChange(enabled: Boolean) {
+        viewModelScope.launch { container.preferencesRepository.setBreakingNewsAlertsEnabled(enabled) }
+        val app = getApplication<Application>()
+        if (enabled) BreakingNewsScheduler.schedule(app) else BreakingNewsScheduler.cancel(app)
     }
 
     fun onPresetSourceToggle(id: String, enabled: Boolean) {

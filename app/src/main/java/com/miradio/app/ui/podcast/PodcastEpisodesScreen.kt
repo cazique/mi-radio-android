@@ -13,6 +13,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Card
@@ -53,9 +55,19 @@ fun PodcastEpisodesScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(state.podcastName.ifBlank { "Podcast" }, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                title = { Text(state.podcast?.name ?: "Podcast", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null) }
+                },
+                actions = {
+                    if (state.podcast != null) {
+                        IconButton(onClick = viewModel::onToggleSubscription) {
+                            Icon(
+                                imageVector = if (state.isSubscribed) Icons.Filled.Check else Icons.Filled.Add,
+                                contentDescription = if (state.isSubscribed) "Dejar de seguir" else "Seguir este podcast",
+                            )
+                        }
+                    }
                 },
             )
         },
@@ -83,9 +95,9 @@ fun PodcastEpisodesScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        PodcastArtwork(url = state.podcastArtworkUrl, modifier = Modifier.size(72.dp))
+                        PodcastArtwork(url = state.podcast?.artworkUrl, modifier = Modifier.size(72.dp))
                         Column {
-                            Text(state.podcastName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                            Text(state.podcast?.name.orEmpty(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                             Text(
                                 text = "${state.episodes.size} episodios",
                                 style = MaterialTheme.typography.bodyMedium,
@@ -141,12 +153,22 @@ private fun EpisodeRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp),
                 )
+                episode.description?.let { description ->
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
                 if (hasProgress && !isCurrent) {
                     Text(
                         text = "Continuar escuchando",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(top = 2.dp),
+                        modifier = Modifier.padding(top = 4.dp),
                     )
                 }
             }

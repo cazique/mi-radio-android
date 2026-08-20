@@ -9,9 +9,12 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
@@ -77,6 +80,26 @@ fun PodcastsScreen(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             )
 
+            if (!state.isSearchResults && state.subscriptions.isNotEmpty()) {
+                Text(
+                    text = "Tus podcasts",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(state.subscriptions, key = { it.collectionId }) { podcast ->
+                        PodcastTile(
+                            podcast = podcast,
+                            onClick = { onOpenPodcast(podcast.collectionId) },
+                            modifier = Modifier.width(120.dp),
+                        )
+                    }
+                }
+            }
+
             Text(
                 text = if (state.isSearchResults) "Resultados" else "Más populares",
                 style = MaterialTheme.typography.titleMedium,
@@ -114,7 +137,11 @@ fun PodcastsScreen(
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     items(state.results, key = { it.collectionId }) { podcast ->
-                        PodcastTile(podcast = podcast, onClick = { onOpenPodcast(podcast.collectionId) })
+                        PodcastTile(
+                            podcast = podcast,
+                            onClick = { onOpenPodcast(podcast.collectionId) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                 }
             }
@@ -123,8 +150,8 @@ fun PodcastsScreen(
 }
 
 @Composable
-private fun PodcastTile(podcast: Podcast, onClick: () -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+private fun PodcastTile(podcast: Podcast, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.clickable(onClick = onClick)) {
         PodcastArtwork(url = podcast.artworkUrl, modifier = Modifier.fillMaxWidth().aspectRatio(1f))
         Text(
             text = podcast.name,

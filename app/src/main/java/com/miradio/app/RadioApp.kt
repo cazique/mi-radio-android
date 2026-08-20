@@ -15,12 +15,15 @@ import com.miradio.app.domain.usecase.ToggleFavoriteUseCase
 import com.miradio.app.domain.usecase.UpdateStationUseCase
 import com.miradio.app.domain.usecase.ValidateStreamUrlUseCase
 import com.miradio.app.util.AemetService
+import com.miradio.app.util.BreakingNewsScheduler
 import com.miradio.app.util.DiagnosticsLog
 import com.miradio.app.util.UpdateChecker
 import com.miradio.app.util.WeatherService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 /**
  * Contenedor manual de dependencias. Con el tamaño de esta app no hace
@@ -65,5 +68,14 @@ class RadioApp : Application() {
         DiagnosticsLog.log(this, "App", "onCreate versión ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
         container = AppContainer(this)
         UpdateChecker.start(this, appScope)
+        // enqueueUniquePeriodicWork con KEEP es idempotente: si ya estaba
+        // programado, esto no hace nada. Solo hace falta por si el trabajo
+        // periódico se perdiera por algún motivo (p. ej. datos de la app
+        // borrados a mano) mientras el ajuste seguía activado.
+        appScope.launch {
+            if (container.preferencesRepository.breakingNewsAlertsEnabled.first()) {
+                BreakingNewsScheduler.schedule(this@RadioApp)
+            }
+        }
     }
 }

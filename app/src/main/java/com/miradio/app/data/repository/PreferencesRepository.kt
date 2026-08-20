@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.miradio.app.BuildConfig
 import com.miradio.app.domain.model.CustomNewsSource
+import com.miradio.app.domain.model.Podcast
 import com.miradio.app.domain.model.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -51,6 +52,9 @@ class PreferencesRepository(private val context: Context) {
         val LOG_UPLOAD_WEBHOOK_URL = stringPreferencesKey("log_upload_webhook_url")
         val NEWS_SOURCE_AFFINITY = stringPreferencesKey("news_source_affinity")
         val PODCAST_PROGRESS = stringPreferencesKey("podcast_progress")
+        val SUBSCRIBED_PODCASTS = stringPreferencesKey("subscribed_podcasts")
+        val BREAKING_NEWS_ALERTS = booleanPreferencesKey("breaking_news_alerts")
+        val NOTIFIED_BREAKING_NEWS_LINKS = stringPreferencesKey("notified_breaking_news_links")
     }
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -171,6 +175,26 @@ class PreferencesRepository(private val context: Context) {
     val podcastProgress: Flow<Map<String, Long>> = context.dataStore.data.map { prefs ->
         val raw = prefs[Keys.PODCAST_PROGRESS] ?: return@map emptyMap()
         runCatching { json.decodeFromString<Map<String, Long>>(raw) }.getOrDefault(emptyMap())
+    }
+
+    /** Podcasts que se siguen, con el feedUrl ya resuelto (evita la consulta
+     *  extra de "lookup" que hace falta para uno sin seguir). */
+    val subscribedPodcasts: Flow<List<Podcast>> = context.dataStore.data.map { prefs ->
+        val raw = prefs[Keys.SUBSCRIBED_PODCASTS] ?: return@map emptyList()
+        runCatching { json.decodeFromString<List<Podcast>>(raw) }.getOrDefault(emptyList())
+    }
+
+    /** Avisa con una notificación cuando aparece una noticia de última hora
+     *  (título que empieza por "Última hora") en cualquier fuente activa.
+     *  Desactivado por defecto: es una comprobación periódica en segundo
+     *  plano, no todo el mundo la quiere encendida. */
+    val breakingNewsAlertsEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.BREAKING_NEWS_ALERTS] ?: false }
+
+    /** Enlaces de noticias de última hora ya notificadas, para no avisar dos
+     *  veces de la misma. */
+    val notifiedBreakingNewsLinks: Flow<Set<String>> = context.dataStore.data.map { prefs ->
+        prefs[Keys.NOTIFIED_BREAKING_NEWS_LINKS]?.let { runCatching { json.decodeFromString<Set<String>>(it) }.getOrDefault(emptySet()) }
+            ?: emptySet()
     }
 
     suspend fun setLastStation(id: String) {
@@ -309,6 +333,39 @@ class PreferencesRepository(private val context: Context) {
                 if (map.size > 200) map.entries.drop(map.size - 200).associate { it.key to it.value } else map
             }
             prefs[Keys.PODCAST_PROGRESS] = json.encodeToString(updated)
+        }
+    }
+
+    /** Guarda [podcast] (con feedUrl ya resuelto) o lo quita, según
+     *  [subscribed]. No hace nada si ya estaba en el estado pedido. */
+    suspend fun setPodcastSubscribed(podcast: Podcast, subscribed: Boolean) {
+        context.dataStore.edit { prefs ->
+            val current = prefs[Keys.SUBSCRIBED_PODCASTS]
+                ?.let { runCatching { json.decodeFromString<List<Podcast>>(it) }.getOrDefault(emptyList()) }
+                ?: emptyList()
+            val updated = if (subscribed) {
+                if (current.any { it.collectionId == podcast.collectionId }) current else current + podcast
+            } else {
+                current.filterNot { it.collectionId == podcast.collectionId }
+            }
+            prefs[Keys.SUBSCRIBED_PODCASTS] = json.encodeToString(updated)
+        }
+    }
+
+    suspend fun setBreakingNewsAlertsEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.BREAKING_NEWS_ALERTS] = enabled }
+    }
+
+    /** Marca [link] como ya notificado, y se queda solo con los 100 más
+     *  recientes para no crecer sin límite. Sin orden garantizado (es un
+     *  Set): basta con que no se pierda ninguno reciente por el camino. */
+    suspend fun markBreakingNewsNotified(link: String) {
+        context.dataStore.edit { prefs ->
+            val current = prefs[Keys.NOTIFIED_BREAKING_NEWS_LINKS]
+                ?.let { runCatching { json.decodeFromString<Set<String>>(it) }.getOrDefault(emptySet()) }
+                ?: emptySet()
+            val updated = (current + link).let { set -> if (set.size > 100) set.toList().takeLast(100).toSet() else set }
+            prefs[Keys.NOTIFIED_BREAKING_NEWS_LINKS] = json.encodeToString(updated)
         }
     }
 

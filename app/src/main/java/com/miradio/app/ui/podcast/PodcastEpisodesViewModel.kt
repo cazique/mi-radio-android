@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.miradio.app.AppContainer
 import com.miradio.app.domain.model.PlaybackStatus
 import com.miradio.app.domain.model.PlayerUiState
+import com.miradio.app.domain.model.Podcast
 import com.miradio.app.domain.model.PodcastEpisode
 import com.miradio.app.domain.model.RadioStation
 import com.miradio.app.domain.model.StationSource
@@ -27,8 +28,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class PodcastEpisodesUiState(
-    val podcastName: String = "",
-    val podcastArtworkUrl: String? = null,
+    val podcast: Podcast? = null,
     val episodes: List<PodcastEpisode> = emptyList(),
     val isLoading: Boolean = true,
     val error: String? = null,
@@ -36,6 +36,7 @@ data class PodcastEpisodesUiState(
     /** Posición (ms) por episodio ya escuchado en parte, para poder mostrar
      *  "reanudar" en vez de "reproducir" en la lista. */
     val progress: Map<String, Long> = emptyMap(),
+    val isSubscribed: Boolean = false,
 ) {
     val playingEpisodeId: String?
         get() = player.station?.id?.takeIf {
@@ -55,9 +56,14 @@ class PodcastEpisodesViewModel(
     val state: StateFlow<PodcastEpisodesUiState> = combine(
         podcastState,
         container.preferencesRepository.podcastProgress,
+        container.preferencesRepository.subscribedPodcasts,
         PlaybackServiceConnector.player.flatMapLatest { it?.uiState ?: flowOf(PlayerUiState()) },
-    ) { base, progress, player ->
-        base.copy(progress = progress, player = player)
+    ) { base, progress, subscriptions, player ->
+        base.copy(
+            progress = progress,
+            player = player,
+            isSubscribed = base.podcast?.let { podcast -> subscriptions.any { it.collectionId == podcast.collectionId } } ?: false,
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PodcastEpisodesUiState())
 
     init {
@@ -68,7 +74,7 @@ class PodcastEpisodesViewModel(
         viewModelScope.launch {
             container.podcastRepository.resolvePodcast(collectionId)
                 .onSuccess { podcast ->
-                    podcastState.update { it.copy(podcastName = podcast.name, podcastArtworkUrl = podcast.artworkUrl) }
+                    podcastState.update { it.copy(podcast = podcast) }
                     container.podcastRepository.fetchEpisodes(podcast)
                         .onSuccess { episodes -> podcastState.update { it.copy(episodes = episodes, isLoading = false) } }
                         .onFailure {
@@ -79,6 +85,14 @@ class PodcastEpisodesViewModel(
                     podcastState.update { it.copy(isLoading = false, error = "No se ha podido abrir este podcast.") }
                 }
         }
+    }
+
+    /** Guarda (o quita) este podcast de "Tus podcasts", ya con el feedUrl
+     *  resuelto para no tener que volver a pedirlo la próxima vez. */
+    fun onToggleSubscription() {
+        val podcast = state.value.podcast ?: return
+        val subscribed = state.value.isSubscribed
+        viewModelScope.launch { container.preferencesRepository.setPodcastSubscribed(podcast, !subscribed) }
     }
 
     /** Si ya es el episodio sonando, alterna play/pausa; si no, lo arranca

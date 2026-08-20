@@ -173,6 +173,11 @@ dependencies {
     // DataStore (última emisora, último dispositivo cast, ajustes)
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
+    // Trabajo periódico en segundo plano (avisos de última hora), respeta
+    // Doze/restricciones de batería sin necesitar un servicio en primer
+    // plano permanente.
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+
     // Serialización JSON (catálogo remoto de emisoras)
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 

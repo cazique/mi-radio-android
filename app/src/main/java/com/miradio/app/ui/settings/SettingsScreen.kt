@@ -185,6 +185,7 @@ fun SettingsScreen(
                 SettingsCard {
                     SectionHeader(Icons.Filled.Newspaper, SectionPurple, "Noticias")
                     NewsAutoRefreshSection(enabled = state.newsAutoRefresh, onEnabledChange = viewModel::onNewsAutoRefreshChange)
+                    BreakingNewsAlertsSection(enabled = state.breakingNewsAlerts, onEnabledChange = viewModel::onBreakingNewsAlertsChange)
                     PresetNewsSourcesSection(
                         enabledIds = state.enabledPresetSources,
                         onToggle = viewModel::onPresetSourceToggle,
@@ -664,6 +665,28 @@ private fun NewsAutoRefreshSection(enabled: Boolean, onEnabledChange: (Boolean) 
             Text("Actualizar noticias automáticamente", style = MaterialTheme.typography.titleMedium)
             Text(
                 text = "Refresca la pestaña Noticias sola de vez en cuando mientras la tienes abierta.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = enabled, onCheckedChange = onEnabledChange)
+    }
+}
+
+/** Comprobación periódica en segundo plano (WorkManager, cada 30 min) de las
+ *  fuentes activas: si aparece un titular de "Última hora", avisa con una
+ *  notificación. Desactivado por defecto. */
+@Composable
+private fun BreakingNewsAlertsSection(enabled: Boolean, onEnabledChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+            Text("Avisos de última hora", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "Notifica cuando una fuente activa publica una noticia de última hora.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
