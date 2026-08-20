@@ -2,6 +2,8 @@ package com.miradio.app.ui.home
 
 import android.content.Intent
 import android.provider.Settings
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -53,6 +55,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
@@ -73,6 +77,7 @@ import com.miradio.app.ui.components.StationLogo
 import com.miradio.app.ui.components.WeatherCard
 import com.miradio.app.util.AppUpdater
 import com.miradio.app.util.UpdateChecker
+import com.miradio.app.util.extractDominantColor
 
 /**
  * Pantalla de Inicio curada: "ahora suena", últimas escuchadas y accesos
@@ -92,6 +97,32 @@ fun HomeLandingScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val favoritesCount = state.allStations.count { it.isFavorite }
+
+    // Mismo truco que la pantalla de reproducción: el color dominante del
+    // logo de lo que suena tiñe el fondo (aquí solo la cabecera, el resto de
+    // Inicio sigue con el fondo normal), para que el ambiente de color no
+    // quede solo en el reproductor a pantalla completa.
+    val context = LocalContext.current
+    val fallbackColor = MaterialTheme.colorScheme.background
+    var dominantColor by remember { mutableStateOf(fallbackColor) }
+    LaunchedEffect(state.displayedStation?.logoUrl, fallbackColor) {
+        dominantColor = extractDominantColor(context, state.displayedStation?.logoUrl, fallbackColor)
+    }
+    val animatedColor by animateColorAsState(
+        targetValue = dominantColor,
+        animationSpec = tween(durationMillis = 700),
+        label = "homeHeaderBackground",
+    )
+    val heroBrush = Brush.verticalGradient(
+        colors = listOf(
+            Color(
+                red = animatedColor.red * 0.4f,
+                green = animatedColor.green * 0.4f,
+                blue = animatedColor.blue * 0.4f,
+            ),
+            MaterialTheme.colorScheme.background,
+        ),
+    )
 
     Scaffold(
         topBar = {
@@ -140,37 +171,39 @@ fun HomeLandingScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState()),
         ) {
-            NotificationPermissionBanner()
-            UpdateAvailableBanner()
+            Column(modifier = Modifier.fillMaxWidth().background(heroBrush)) {
+                NotificationPermissionBanner()
+                UpdateAvailableBanner()
 
-            ClockHeader(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+                ClockHeader(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
 
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                DeviceIndicator(
-                    deviceName = if (state.player.outputDevice == OutputDevice.CAST) {
-                        state.player.castDeviceName ?: stringResource(R.string.home_device_this_phone)
-                    } else {
-                        stringResource(R.string.home_device_this_phone)
-                    },
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    DeviceIndicator(
+                        deviceName = if (state.player.outputDevice == OutputDevice.CAST) {
+                            state.player.castDeviceName ?: stringResource(R.string.home_device_this_phone)
+                        } else {
+                            stringResource(R.string.home_device_this_phone)
+                        },
+                    )
+                }
+
+                WeatherCard(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+
+                PlayerCard(
+                    station = state.displayedStation,
+                    status = state.player.status,
+                    onPlayPauseClick = { viewModel.onPrimaryPlayClick(state) },
+                    onCardClick = if (state.displayedStation != null && !state.simpleMode) onOpenPlayer else null,
+                    nowPlayingTitle = state.player.nowPlayingTitle,
+                    onPreviousStation = { viewModel.onSkipStation(-1) },
+                    onNextStation = { viewModel.onSkipStation(1) },
+                    volume = state.player.volume,
+                    onVolumeChange = viewModel::onVolumeChange,
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp)
+                        .fillMaxWidth(),
                 )
             }
-
-            WeatherCard(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
-
-            PlayerCard(
-                station = state.displayedStation,
-                status = state.player.status,
-                onPlayPauseClick = { viewModel.onPrimaryPlayClick(state) },
-                onCardClick = if (state.displayedStation != null && !state.simpleMode) onOpenPlayer else null,
-                nowPlayingTitle = state.player.nowPlayingTitle,
-                onPreviousStation = { viewModel.onSkipStation(-1) },
-                onNextStation = { viewModel.onSkipStation(1) },
-                volume = state.player.volume,
-                onVolumeChange = viewModel::onVolumeChange,
-                modifier = Modifier
-                    .padding(horizontal = 16.dp)
-                    .fillMaxWidth(),
-            )
 
             if (state.simpleMode) {
                 SimpleModeFavorites(

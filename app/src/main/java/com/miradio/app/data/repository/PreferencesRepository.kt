@@ -74,9 +74,13 @@ class PreferencesRepository(private val context: Context) {
 
     val lastSyncMillis: Flow<Long?> = context.dataStore.data.map { it[Keys.LAST_SYNC_MILLIS] }
 
+    /** Oscuro por defecto (no "según el sistema"): es el estilo que se ha
+     *  pedido explícitamente para la app entera (oscuro con degradados de
+     *  color propios, como Spotify/YouTube Music), y ese estilo solo se ve
+     *  bien de verdad en oscuro. */
     val themeMode: Flow<ThemeMode> = context.dataStore.data.map { prefs ->
         prefs[Keys.THEME_MODE]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() }
-            ?: ThemeMode.SYSTEM
+            ?: ThemeMode.DARK
     }
 
     /** Retardo (en segundos) con el que se reproduce el directo en el móvil,
@@ -110,10 +114,13 @@ class PreferencesRepository(private val context: Context) {
     val hideAddButton: Flow<Boolean> = context.dataStore.data.map { it[Keys.HIDE_ADD_BUTTON] ?: false }
 
     /** Colores del sistema (Material You, Android 12+) en vez de la paleta de
-     *  marca. Activado por defecto (a partir de Android 12; en versiones
-     *  anteriores no hay color dinámico del sistema y se usa igualmente la
-     *  paleta propia). */
-    val dynamicColorEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.DYNAMIC_COLOR] ?: true }
+     *  marca. Desactivado por defecto: Material You saca sus colores del
+     *  fondo de pantalla de cada móvil, así que apaga justo lo que se ha
+     *  pedido (un aspecto oscuro con degradados de color propios y
+     *  consistente, como Spotify, no distinto y descolorido según el
+     *  fondo de pantalla de cada cual). Sigue pudiéndose activar a mano en
+     *  Ajustes para quien lo prefiera. */
+    val dynamicColorEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.DYNAMIC_COLOR] ?: false }
 
     /** id de la última entrada del historial de cambios ([com.miradio.app.util.Changelog])
      *  que el usuario ya ha visto, para saber si hay novedades que enseñarle
