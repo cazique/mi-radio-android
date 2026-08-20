@@ -3,8 +3,10 @@ package com.miradio.app.ui.news
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,11 +32,13 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.TextDecrease
 import androidx.compose.material.icons.filled.TextIncrease
@@ -65,12 +69,16 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -89,8 +97,10 @@ import com.miradio.app.domain.model.NewspaperCovers
 import com.miradio.app.domain.model.NewspaperCategory
 import com.miradio.app.domain.model.searchFallbackUrl
 import com.miradio.app.domain.model.todayImageUrl
+import com.miradio.app.util.ImageSaver
 import com.miradio.app.util.NewsTts
 import com.miradio.app.util.parseRssPubDateMillis
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -537,7 +547,7 @@ private fun PortadasRow(covers: List<NewspaperCover>) {
 @Composable
 private fun NewspaperCoverTile(cover: NewspaperCover, onClick: () -> Unit) {
     Column(
-        modifier = Modifier.width(96.dp).clickable(onClick = onClick),
+        modifier = Modifier.width(150.dp).clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         SubcomposeAsyncImage(
@@ -547,62 +557,159 @@ private fun NewspaperCoverTile(cover: NewspaperCover, onClick: () -> Unit) {
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(0.72f)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(16.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant),
-            loading = { CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp) },
+            loading = { CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp) },
             error = {
                 Icon(
                     Icons.Filled.Newspaper,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(32.dp),
                 )
             },
         )
         Text(
             text = cover.name,
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelLarge,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            modifier = Modifier.padding(top = 4.dp),
+            modifier = Modifier.padding(top = 6.dp),
         )
     }
 }
 
+/** Visor a pantalla completa de una portada: pellizcar para hacer zoom y
+ *  arrastrar para moverse por la imagen ampliada, más guardar en la galería
+ *  o compartirla por cualquier app. Se descarga aparte (no reutiliza la
+ *  miniatura de Coil) para poder quedarse con el Bitmap y así poder
+ *  guardarlo/compartirlo. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NewspaperCoverDialog(cover: NewspaperCover, onDismiss: () -> Unit) {
     val context = LocalContext.current
-    AlertDialog(
+    val scope = rememberCoroutineScope()
+    var bitmap by remember(cover) { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var loadFailed by remember(cover) { mutableStateOf(false) }
+    var isBusy by remember { mutableStateOf(false) }
+    var scale by remember { mutableStateOf(1f) }
+    var offset by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+
+    LaunchedEffect(cover) {
+        val result = ImageSaver.downloadBitmap(context, cover.todayImageUrl())
+        bitmap = result
+        loadFailed = result == null
+    }
+
+    fun feedback(ok: Boolean, successMessage: String) {
+        Toast.makeText(context, if (ok) successMessage else "No se ha podido completar la operación.", Toast.LENGTH_SHORT).show()
+    }
+
+    fun saveCover(target: android.graphics.Bitmap) {
+        scope.launch {
+            isBusy = true
+            val ok = ImageSaver.saveToGallery(context, target, "portada_${cover.code}_${System.currentTimeMillis()}")
+            isBusy = false
+            feedback(ok, "Portada guardada en la galería.")
+        }
+    }
+
+    val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        val target = bitmap
+        if (granted && target != null) saveCover(target) else if (!granted) feedback(false, "")
+    }
+
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { Text(cover.name) },
-        text = {
-            SubcomposeAsyncImage(
-                model = cover.todayImageUrl(),
-                contentDescription = cover.name,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxWidth(),
-                loading = { Box(modifier = Modifier.fillMaxWidth().height(300.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } },
-                error = {
-                    Box(modifier = Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(cover.name) },
+                    navigationIcon = {
+                        IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null) }
+                    },
+                    actions = {
+                        IconButton(
+                            onClick = {
+                                bitmap?.let { scope.launch { ImageSaver.shareImage(context, it, "portada_${cover.code}") } }
+                            },
+                            enabled = bitmap != null && !isBusy,
+                        ) {
+                            Icon(Icons.Filled.Share, contentDescription = "Compartir portada")
+                        }
+                        IconButton(
+                            onClick = {
+                                val target = bitmap ?: return@IconButton
+                                if (ImageSaver.needsWritePermission() &&
+                                    androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
+                                        android.content.pm.PackageManager.PERMISSION_GRANTED
+                                ) {
+                                    permissionLauncher.launch(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                                } else {
+                                    saveCover(target)
+                                }
+                            },
+                            enabled = bitmap != null && !isBusy,
+                        ) {
+                            Icon(Icons.Filled.Download, contentDescription = "Guardar portada")
+                        }
+                    },
+                )
+            },
+            containerColor = Color.Black,
+        ) { padding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .background(Color.Black)
+                    .pointerInput(cover) {
+                        detectTransformGestures { _, pan, zoom, _ ->
+                            val newScale = (scale * zoom).coerceIn(1f, 6f)
+                            scale = newScale
+                            offset = if (newScale <= 1f) androidx.compose.ui.geometry.Offset.Zero else offset + pan
+                        }
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                when {
+                    bitmap != null -> Image(
+                        bitmap = bitmap!!.asImageBitmap(),
+                        contentDescription = cover.name,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer(
+                                scaleX = scale,
+                                scaleY = scale,
+                                translationX = offset.x,
+                                translationY = offset.y,
+                            ),
+                    )
+                    loadFailed -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            "No se ha podido cargar la miniatura ahora mismo.",
+                            "No se ha podido cargar la portada ahora mismo.",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = Color.White,
+                            modifier = Modifier.padding(24.dp),
                         )
+                        OutlinedButton(onClick = {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(cover.searchFallbackUrl())))
+                        }) { Text("Buscar en el navegador") }
                     }
-                },
-            )
-        },
-        confirmButton = {
-            Button(onClick = {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(cover.searchFallbackUrl())))
-                onDismiss()
-            }) { Text("Buscar en el navegador") }
-        },
-        dismissButton = {
-            OutlinedButton(onClick = onDismiss) { Text("Cerrar") }
-        },
-    )
+                    else -> CircularProgressIndicator(color = Color.White)
+                }
+                if (isBusy) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.BottomCenter).padding(24.dp))
+                }
+            }
+        }
+    }
 }
 
 /** Detalle a pantalla completa: título, foto e íntegro el resumen del RSS,

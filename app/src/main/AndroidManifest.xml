@@ -25,6 +25,11 @@
          sigue exigiendo que el usuario confirme la instalación). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- Guardar una portada de periódico en la galería en Android 9 o
+         anterior: a partir de Android 10 (Q) guardar en MediaStore no exige
+         este permiso, así que solo hace falta hasta la versión anterior. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+
     <!-- Alarmas despertador: hora exacta aunque el móvil esté en reposo,
          reprogramarlas tras reiniciar el móvil, y la pantalla de alarma
          sonando a pantalla completa (incluso con el móvil bloqueado). -->
