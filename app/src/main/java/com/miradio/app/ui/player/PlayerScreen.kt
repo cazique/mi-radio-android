@@ -16,6 +16,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Cast
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -206,10 +208,25 @@ fun PlayerScreen(
                 )
             }
 
-            Waveform(
-                isActive = isPlaying,
-                modifier = Modifier.padding(top = 28.dp),
-            )
+            // durationMs > 0 = contenido bajo demanda (episodio de podcast,
+            // boletín): ahí tiene sentido una barra que se puede arrastrar y
+            // saltar 15 s, cosas que no existen en un directo de radio (no
+            // hay "hacia atrás" al que ir). En un directo se deja tal cual
+            // el Waveform + emisora anterior/siguiente de siempre.
+            val hasDuration = state.player.durationMs > 0
+            if (hasDuration) {
+                PodcastProgressBar(
+                    positionMs = state.player.positionMs,
+                    durationMs = state.player.durationMs,
+                    onSeek = viewModel::onSeek,
+                    modifier = Modifier.fillMaxWidth().padding(top = 28.dp),
+                )
+            } else {
+                Waveform(
+                    isActive = isPlaying,
+                    modifier = Modifier.padding(top = 28.dp),
+                )
+            }
 
             Row(
                 modifier = Modifier
@@ -218,22 +235,36 @@ fun PlayerScreen(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(
-                    onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); viewModel.onSkipStation(-1) },
-                    enabled = station != null,
-                ) {
-                    Icon(Icons.Filled.SkipPrevious, contentDescription = stringResource(R.string.cd_previous_station), tint = Color.White, modifier = Modifier.size(36.dp))
-                }
-                PlayPauseButton(
-                    status = state.player.status,
-                    enabled = station != null,
-                    onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); viewModel.onPlayPauseClick() },
-                )
-                IconButton(
-                    onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); viewModel.onSkipStation(1) },
-                    enabled = station != null,
-                ) {
-                    Icon(Icons.Filled.SkipNext, contentDescription = stringResource(R.string.cd_next_station), tint = Color.White, modifier = Modifier.size(36.dp))
+                if (hasDuration) {
+                    IconButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); viewModel.onSkipSeconds(-15) }) {
+                        Icon(Icons.Filled.FastRewind, contentDescription = "Retroceder 15 segundos", tint = Color.White, modifier = Modifier.size(36.dp))
+                    }
+                    PlayPauseButton(
+                        status = state.player.status,
+                        enabled = station != null,
+                        onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); viewModel.onPlayPauseClick() },
+                    )
+                    IconButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); viewModel.onSkipSeconds(15) }) {
+                        Icon(Icons.Filled.FastForward, contentDescription = "Avanzar 15 segundos", tint = Color.White, modifier = Modifier.size(36.dp))
+                    }
+                } else {
+                    IconButton(
+                        onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); viewModel.onSkipStation(-1) },
+                        enabled = station != null,
+                    ) {
+                        Icon(Icons.Filled.SkipPrevious, contentDescription = stringResource(R.string.cd_previous_station), tint = Color.White, modifier = Modifier.size(36.dp))
+                    }
+                    PlayPauseButton(
+                        status = state.player.status,
+                        enabled = station != null,
+                        onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); viewModel.onPlayPauseClick() },
+                    )
+                    IconButton(
+                        onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); viewModel.onSkipStation(1) },
+                        enabled = station != null,
+                    ) {
+                        Icon(Icons.Filled.SkipNext, contentDescription = stringResource(R.string.cd_next_station), tint = Color.White, modifier = Modifier.size(36.dp))
+                    }
                 }
             }
 
@@ -340,6 +371,52 @@ fun PlayerScreen(
             },
         )
     }
+}
+
+/**
+ * Barra de progreso arrastrable para contenido bajo demanda. Mientras se
+ * arrastra el pulgar se ignoran las actualizaciones de posición que llegan
+ * del reproductor (cada 500 ms): si no, el pulgar "saltaría" bajo el dedo en
+ * cuanto llegara la siguiente actualización a mitad de un arrastre.
+ */
+@Composable
+private fun PodcastProgressBar(
+    positionMs: Long,
+    durationMs: Long,
+    onSeek: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var draggingValue by remember { mutableStateOf<Float?>(null) }
+    val shownPositionMs = draggingValue?.toLong() ?: positionMs
+
+    Column(modifier = modifier) {
+        Slider(
+            value = shownPositionMs.toFloat(),
+            valueRange = 0f..durationMs.toFloat().coerceAtLeast(1f),
+            onValueChange = { draggingValue = it },
+            onValueChangeFinished = {
+                draggingValue?.let { onSeek(it.toLong()) }
+                draggingValue = null
+            },
+            colors = SliderDefaults.colors(
+                thumbColor = MaterialTheme.colorScheme.secondary,
+                activeTrackColor = MaterialTheme.colorScheme.secondary,
+                inactiveTrackColor = Color(0xFF2A2A34),
+            ),
+        )
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(formatDuration(shownPositionMs), color = Color(0xFFB0B0BC), style = MaterialTheme.typography.labelMedium)
+            Text(formatDuration(durationMs), color = Color(0xFFB0B0BC), style = MaterialTheme.typography.labelMedium)
+        }
+    }
+}
+
+private fun formatDuration(millis: Long): String {
+    val totalSeconds = (millis / 1000).coerceAtLeast(0)
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val seconds = totalSeconds % 60
+    return if (hours > 0) "%d:%02d:%02d".format(hours, minutes, seconds) else "%d:%02d".format(minutes, seconds)
 }
 
 @Composable

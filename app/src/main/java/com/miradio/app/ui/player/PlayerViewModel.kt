@@ -54,6 +54,16 @@ class PlayerViewModel(
         PlaybackServiceConnector.player.value?.stop()
     }
 
+    /** Solo tiene efecto real con contenido bajo demanda (podcast, boletín);
+     *  Media3 simplemente lo ignora en un directo de radio sin duración. */
+    fun onSeek(positionMs: Long) {
+        PlaybackServiceConnector.player.value?.seekTo(positionMs)
+    }
+
+    fun onSkipSeconds(deltaSeconds: Int) {
+        PlaybackServiceConnector.player.value?.skipSeconds(deltaSeconds)
+    }
+
     fun onFavoriteToggle() {
         val station = PlaybackServiceConnector.player.value?.uiState?.value?.station ?: return
         viewModelScope.launch { container.toggleFavoriteUseCase(station.id, !station.isFavorite) }

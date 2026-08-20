@@ -5,6 +5,7 @@ import com.miradio.app.data.database.AppDatabase
 import com.miradio.app.data.remote.RemoteStationsService
 import com.miradio.app.data.repository.AlarmRepository
 import com.miradio.app.data.repository.NewsRepository
+import com.miradio.app.data.repository.PodcastRepository
 import com.miradio.app.data.repository.PreferencesRepository
 import com.miradio.app.data.repository.StationRepository
 import com.miradio.app.domain.usecase.AddStationUseCase
@@ -43,6 +44,7 @@ class AppContainer(app: Application) {
         RefreshRemoteStationsUseCase(stationRepository, preferencesRepository)
     }
     val newsRepository by lazy { NewsRepository(app) }
+    val podcastRepository by lazy { PodcastRepository(app) }
     val weatherService by lazy { WeatherService() }
     val aemetService by lazy { AemetService() }
     val alarmRepository by lazy { AlarmRepository(app, database.alarmDao()) }

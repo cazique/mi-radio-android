@@ -50,6 +50,7 @@ class PreferencesRepository(private val context: Context) {
         val ENABLED_PRESET_NEWS_SOURCES = stringPreferencesKey("enabled_preset_news_sources")
         val LOG_UPLOAD_WEBHOOK_URL = stringPreferencesKey("log_upload_webhook_url")
         val NEWS_SOURCE_AFFINITY = stringPreferencesKey("news_source_affinity")
+        val PODCAST_PROGRESS = stringPreferencesKey("podcast_progress")
     }
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -163,6 +164,13 @@ class PreferencesRepository(private val context: Context) {
     val newsSourceAffinity: Flow<Map<String, Int>> = context.dataStore.data.map { prefs ->
         val raw = prefs[Keys.NEWS_SOURCE_AFFINITY] ?: return@map emptyMap()
         runCatching { json.decodeFromString<Map<String, Int>>(raw) }.getOrDefault(emptyMap())
+    }
+
+    /** Posición (ms) por la que se quedó cada episodio de podcast, para
+     *  poder retomarlo donde se dejó en vez de siempre desde el principio. */
+    val podcastProgress: Flow<Map<String, Long>> = context.dataStore.data.map { prefs ->
+        val raw = prefs[Keys.PODCAST_PROGRESS] ?: return@map emptyMap()
+        runCatching { json.decodeFromString<Map<String, Long>>(raw) }.getOrDefault(emptyMap())
     }
 
     suspend fun setLastStation(id: String) {
@@ -286,6 +294,21 @@ class PreferencesRepository(private val context: Context) {
                 ?: emptyMap()
             val updated = current + (sourceId to (current[sourceId] ?: 0) + 1)
             prefs[Keys.NEWS_SOURCE_AFFINITY] = json.encodeToString(updated)
+        }
+    }
+
+    /** Guarda por dónde va [episodeId]. Se limita a los 200 episodios
+     *  guardados más recientes para que esto no crezca sin límite con el
+     *  tiempo (cada entrada pesa poco, pero "sin límite" no es un límite). */
+    suspend fun savePodcastProgress(episodeId: String, positionMs: Long) {
+        context.dataStore.edit { prefs ->
+            val current = prefs[Keys.PODCAST_PROGRESS]
+                ?.let { runCatching { json.decodeFromString<Map<String, Long>>(it) }.getOrDefault(emptyMap()) }
+                ?: emptyMap()
+            val updated = (current + (episodeId to positionMs)).let { map ->
+                if (map.size > 200) map.entries.drop(map.size - 200).associate { it.key to it.value } else map
+            }
+            prefs[Keys.PODCAST_PROGRESS] = json.encodeToString(updated)
         }
     }
 

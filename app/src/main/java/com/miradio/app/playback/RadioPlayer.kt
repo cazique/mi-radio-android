@@ -177,6 +177,50 @@ class RadioPlayer(
         })
         runCatching { connectivityManager?.registerDefaultNetworkCallback(networkCallback) }
             .onFailure { Log.w(TAG, "No se pudo registrar el callback de conectividad: ${it.message}") }
+        scope.launch {
+            while (true) {
+                delay(500)
+                tickPosition()
+            }
+        }
+    }
+
+    /** Se reinicia a -1 en cada [playStation] para que el primer guardado de
+     *  progreso de un episodio nuevo no espere a que la posición avance 5 s
+     *  desde la del episodio anterior. */
+    private var lastPersistedPositionMs = -1L
+
+    /**
+     * Sondea posición/duración cada 500 ms (Media3 no las expone como Flow):
+     * alimenta la barra de progreso de contenido bajo demanda (episodios de
+     * podcast, boletín) y, cada ~5 s mientras se reproduce, guarda el avance
+     * para poder retomar el episodio donde se dejó.
+     */
+    private fun tickPosition() {
+        val duration = activePlayer.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: 0L
+        val position = activePlayer.currentPosition.coerceAtLeast(0L)
+        if (_uiState.value.durationMs != duration || _uiState.value.positionMs != position) {
+            _uiState.update { it.copy(positionMs = position, durationMs = duration) }
+        }
+        val station = currentStation
+        if (duration > 0 && station != null && activePlayer.isPlaying && position - lastPersistedPositionMs >= 5_000) {
+            lastPersistedPositionMs = position
+            scope.launch { preferencesRepository.savePodcastProgress(station.id, position) }
+        }
+    }
+
+    /** Mueve la reproducción a [positionMs]. Sin efecto en un directo de
+     *  radio (Media3 simplemente lo ignora si el contenido no es buscable). */
+    fun seekTo(positionMs: Long) {
+        activePlayer.seekTo(positionMs.coerceAtLeast(0L))
+    }
+
+    /** Avanza/retrocede [deltaSeconds] segundos (negativo para retroceder),
+     *  sin pasarse de los límites del episodio. */
+    fun skipSeconds(deltaSeconds: Int) {
+        val duration = activePlayer.duration.takeIf { it != C.TIME_UNSET }
+        val target = activePlayer.currentPosition + deltaSeconds * 1_000L
+        activePlayer.seekTo(target.coerceIn(0L, duration ?: Long.MAX_VALUE))
     }
 
     /**
@@ -329,27 +373,44 @@ class RadioPlayer(
         }
     }
 
-    fun playStation(station: RadioStation) {
+    /** [startPositionMs] es para retomar un episodio de podcast donde se
+     *  dejó; en una emisora de radio normal se deja en 0 (no tendría sentido
+     *  "reanudar" un directo). */
+    fun playStation(station: RadioStation, startPositionMs: Long = 0L) {
         DiagnosticsLog.log(context, "RadioPlayer", "playStation(${station.id}, ${station.streamUrl})")
         retryJob?.cancel()
         retryAttempt = 0
         currentStation = station
+        lastPersistedPositionMs = -1L
         // Se limpia aquí: si no, al cambiar de emisora se seguía viendo la
         // canción de la anterior (o de ninguna) hasta que llegara el primer
         // metadato ICY de la nueva, que puede tardar según el servidor.
         _uiState.update {
-            it.copy(station = station, status = PlaybackStatus.BUFFERING, errorMessage = null, nowPlayingTitle = null)
+            it.copy(
+                station = station,
+                status = PlaybackStatus.BUFFERING,
+                errorMessage = null,
+                nowPlayingTitle = null,
+                positionMs = startPositionMs,
+                durationMs = 0L,
+            )
         }
-        activePlayer.setMediaItem(buildMediaItem(station))
+        activePlayer.setMediaItem(buildMediaItem(station), startPositionMs)
         activePlayer.prepare()
         activePlayer.playWhenReady = true
         // Centralizado aquí (y no en cada pantalla/comando que puede arrancar
         // una emisora) para que "últimas escuchadas" funcione sin importar
         // si viene de un toque en la lista, de un comando de voz o del
-        // enlace directo de Ok Google.
-        scope.launch {
-            preferencesRepository.setLastStation(station.id)
-            preferencesRepository.addRecentStation(station.id)
+        // enlace directo de Ok Google. Se excluye el contenido bajo demanda
+        // "de un solo uso" (episodio de podcast, boletín): no son emisoras
+        // reales del catálogo, así que guardar su id aquí solo ensuciaría
+        // "última escuchada"/"recientes" con algo que Inicio nunca podría
+        // volver a resolver.
+        if (station.category != "Podcast" && station.category != "Boletín") {
+            scope.launch {
+                preferencesRepository.setLastStation(station.id)
+                preferencesRepository.addRecentStation(station.id)
+            }
         }
     }
 

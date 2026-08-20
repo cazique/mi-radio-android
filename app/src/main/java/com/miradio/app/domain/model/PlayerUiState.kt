@@ -35,4 +35,13 @@ data class PlayerUiState(
      *  que en Cast: la propia interfaz Player de Media3 lo traduce al
      *  volumen del altavoz cuando se está reproduciendo por Cast. */
     val volume: Float = 1f,
+    /** Posición actual, en milisegundos. Solo tiene sentido junto a
+     *  [durationMs]: en un directo de radio no hay nada que arrastrar. */
+    val positionMs: Long = 0L,
+    /** Duración total, en milisegundos. 0 = contenido en directo (sin
+     *  duración fija, como una emisora de radio): la pantalla usa esto para
+     *  decidir si mostrar o no la barra de progreso y los botones de
+     *  avance/retroceso. Solo es mayor que 0 en contenido bajo demanda
+     *  (episodios de podcast, el boletín de noticias). */
+    val durationMs: Long = 0L,
 )

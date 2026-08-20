@@ -13,6 +13,8 @@ import com.miradio.app.ui.home.HomeLandingScreen
 import com.miradio.app.ui.home.HomeScreen
 import com.miradio.app.ui.news.NewsScreen
 import com.miradio.app.ui.player.PlayerScreen
+import com.miradio.app.ui.podcast.PodcastEpisodesScreen
+import com.miradio.app.ui.podcast.PodcastsScreen
 import com.miradio.app.ui.settings.SettingsScreen
 import com.miradio.app.ui.stations.StationEditScreen
 
@@ -28,9 +30,12 @@ object Routes {
     const val ALARMS = "alarms"
     const val ALARM_ADD = "alarms/add"
     const val ALARM_EDIT = "alarms/edit/{alarmId}"
+    const val PODCASTS = "podcasts"
+    const val PODCAST_EPISODES = "podcasts/{collectionId}"
 
     fun stationEdit(id: String) = "stations/edit/$id"
     fun alarmEdit(id: Long) = "alarms/edit/$id"
+    fun podcastEpisodes(collectionId: String) = "podcasts/$collectionId"
 }
 
 @Composable
@@ -101,6 +106,19 @@ fun RadioNavHost(navController: NavHostController = rememberNavController()) {
         ) { backStackEntry ->
             val alarmId = backStackEntry.arguments?.getLong("alarmId")
             AlarmEditScreen(alarmId = alarmId, onBack = { navController.popBackStack() })
+        }
+        composable(Routes.PODCASTS) {
+            PodcastsScreen(
+                onOpenPodcast = { collectionId -> navController.navigate(Routes.podcastEpisodes(collectionId)) },
+                onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+            )
+        }
+        composable(
+            route = Routes.PODCAST_EPISODES,
+            arguments = listOf(navArgument("collectionId") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val collectionId = backStackEntry.arguments?.getString("collectionId").orEmpty()
+            PodcastEpisodesScreen(collectionId = collectionId, onBack = { navController.popBackStack() })
         }
     }
 }
