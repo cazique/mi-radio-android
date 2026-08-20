@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -41,10 +42,13 @@ import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -79,6 +83,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.Lifecycle
@@ -126,17 +131,15 @@ fun SettingsScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SettingsCard {
                 SectionHeader(Icons.Filled.Accessibility, SectionGreen, "Modo simple")
                 SimpleModeSection(enabled = state.simpleMode, onEnabledChange = viewModel::onSimpleModeChange)
                 HideAddButtonSection(enabled = state.hideAddButton, onEnabledChange = viewModel::onHideAddButtonChange)
             }
 
-            HorizontalDivider()
-
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            SettingsCard {
                 SectionHeader(Icons.Filled.Palette, SectionPurple, "Apariencia")
                 ThemeCardPicker(selected = state.themeMode, onSelect = viewModel::onThemeModeChange)
                 TextSizeSection(textScale = state.textScale, onTextScaleChange = viewModel::onTextScaleChange)
@@ -146,9 +149,7 @@ fun SettingsScreen(
             }
 
             if (!state.simpleMode) {
-                HorizontalDivider()
-
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SettingsCard {
                     SectionHeader(Icons.Filled.Sync, SectionPurple, "Catálogo")
                     Text(stringResource(R.string.settings_remote_catalog), style = MaterialTheme.typography.titleMedium)
                     OutlinedTextField(
@@ -181,9 +182,7 @@ fun SettingsScreen(
                     }
                 }
 
-                HorizontalDivider()
-
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SettingsCard {
                     SectionHeader(Icons.Filled.Newspaper, SectionPurple, "Noticias")
                     NewsAutoRefreshSection(enabled = state.newsAutoRefresh, onEnabledChange = viewModel::onNewsAutoRefreshChange)
                     PresetNewsSourcesSection(
@@ -192,9 +191,7 @@ fun SettingsScreen(
                     )
                 }
 
-                HorizontalDivider()
-
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SettingsCard {
                     SectionHeader(Icons.Filled.Cloud, SectionPurple, "Clima")
                     AemetSection(
                         apiKey = state.aemetApiKey,
@@ -208,9 +205,7 @@ fun SettingsScreen(
                 }
             }
 
-            HorizontalDivider()
-
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SettingsCard {
                 SectionHeader(Icons.Filled.Alarm, SectionGreen, "Alarmas")
                 Text(
                     text = "Despiértate con tu emisora favorita, con volumen creciente si quieres.",
@@ -220,9 +215,7 @@ fun SettingsScreen(
                 OutlinedButton(onClick = onOpenAlarms) { Text("Gestionar alarmas") }
             }
 
-            HorizontalDivider()
-
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            SettingsCard(spacing = 16.dp) {
                 SectionHeader(Icons.Filled.Apps, SectionBlue, "Aplicación")
 
                 Column {
@@ -238,6 +231,8 @@ fun SettingsScreen(
 
                 ChangelogSection()
 
+                ShareAppSection()
+
                 NotificationSettingsSection()
 
                 ClearCacheSection()
@@ -246,8 +241,7 @@ fun SettingsScreen(
             }
 
             if (state.debugMode) {
-                HorizontalDivider()
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SettingsCard {
                     SectionHeader(Icons.Filled.Shield, SectionPurple, "Diagnóstico")
                     DiagnosticsSection(
                         webhookUrl = state.logUploadWebhookUrl,
@@ -255,6 +249,55 @@ fun SettingsScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+/** Tarjeta que agrupa una sección de Ajustes: antes cada bloque flotaba
+ *  suelto separado solo por una línea horizontal, sin ninguna superficie
+ *  propia que lo delimitara. Con esto cada sección es una pieza visual
+ *  reconocible de un vistazo, más parecido a los Ajustes del propio Android
+ *  o de cualquier app moderna. */
+@Composable
+private fun SettingsCard(spacing: Dp = 12.dp, content: @Composable ColumnScope.() -> Unit) {
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(spacing),
+            content = content,
+        )
+    }
+}
+
+/** Comparte el enlace del proyecto (no hay ficha en Play Store: la app se
+ *  distribuye desde el propio repositorio) con quien se quiera. */
+@Composable
+private fun ShareAppSection() {
+    val context = LocalContext.current
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Compartir Radio Dari", style = MaterialTheme.typography.titleMedium)
+        Text(
+            text = "Invita a alguien a probar la app.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedButton(
+            onClick = {
+                val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(
+                        Intent.EXTRA_TEXT,
+                        "Prueba Radio Dari, una app de radio: https://github.com/cazique/mi-radio-android",
+                    )
+                }
+                context.startActivity(Intent.createChooser(sendIntent, "Compartir Radio Dari"))
+            },
+        ) {
+            Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+            Text("Compartir")
         }
     }
 }
