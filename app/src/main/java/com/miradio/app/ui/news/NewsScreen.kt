@@ -3,6 +3,7 @@ package com.miradio.app.ui.news
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -64,6 +66,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -357,16 +361,48 @@ private fun NewsArticleCard(article: NewsArticle, sourceLabel: String, onClick: 
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
-            val subtitle = listOfNotNull(sourceLabel, formatArticleDate(article.pubDate)).joinToString(" · ")
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp),
-            )
+            SourceMetaRow(sourceLabel = sourceLabel, pubDate = article.pubDate, modifier = Modifier.padding(top = 8.dp))
         }
     }
 }
+
+/** Medio (con un distintivo de color, sin depender de descargar el logo de
+ *  cada página) + fecha y hora, en una sola línea compacta: lo justo para
+ *  identificar de un vistazo de dónde viene una noticia sin ocupar más
+ *  espacio que un renglón de texto normal. */
+@Composable
+private fun SourceMetaRow(sourceLabel: String, pubDate: String?, modifier: Modifier = Modifier) {
+    val text = listOfNotNull(sourceLabel.takeIf { it.isNotBlank() }, formatArticleDate(pubDate)).joinToString(" · ")
+    if (sourceLabel.isBlank() && text.isBlank()) return
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (sourceLabel.isNotBlank()) {
+            Box(
+                modifier = Modifier.size(18.dp).clip(CircleShape).background(sourceBadgeColor(sourceLabel)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = sourceLabel.first().uppercaseChar().toString(),
+                    color = Color.White,
+                    fontSize = 10.sp,
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            }
+        }
+        if (text.isNotBlank()) {
+            Text(text = text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+private val SOURCE_BADGE_COLORS = listOf(
+    Color(0xFF2E9B5C), Color(0xFF3B6FD4), Color(0xFFD46A3B),
+    Color(0xFF9B4FD4), Color(0xFFD43B7A), Color(0xFF3BAFD4),
+)
+
+/** Mismo color siempre para el mismo medio (hash del nombre), para poder
+ *  reconocerlo de un vistazo entre noticias sin tener que leer el texto. */
+private fun sourceBadgeColor(label: String): Color =
+    SOURCE_BADGE_COLORS[label.hashCode().mod(SOURCE_BADGE_COLORS.size)]
 
 /** Detalle a pantalla completa: título, foto e íntegro el resumen del RSS,
  *  con la opción (nunca obligatoria) de abrir la noticia completa en el
@@ -457,13 +493,7 @@ private fun NewsDetailDialog(article: NewsArticle, sourceLabel: String, onDismis
                         ),
                         fontWeight = FontWeight.Bold,
                     )
-                    val subtitle = listOfNotNull(sourceLabel, formatArticleDate(article.pubDate)).joinToString(" · ")
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 6.dp, bottom = 4.dp),
-                    )
+                    SourceMetaRow(sourceLabel = sourceLabel, pubDate = article.pubDate, modifier = Modifier.padding(top = 6.dp, bottom = 4.dp))
                     Button(
                         onClick = {
                             if (isSpeaking) {
