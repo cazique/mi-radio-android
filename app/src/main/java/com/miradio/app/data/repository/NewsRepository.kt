@@ -28,9 +28,34 @@ class NewsRepository(private val context: Context) {
         .readTimeout(15, TimeUnit.SECONDS)
         .build()
 
-    suspend fun fetchFeed(url: String, sourceId: String? = null): Result<List<NewsArticle>> = withContext(Dispatchers.IO) {
+    suspend fun fetchFeed(url: String, sourceId: String? = null): Result<List<NewsArticle>> =
+        fetchFeed(listOf(url), sourceId)
+
+    /** Prueba cada URL en orden y se queda con la primera que responda con
+     *  algún artículo: así una fuente con [NewsSource.fallbackUrls] no se
+     *  queda rota en cuanto el medio cambia la ruta de su RSS principal. */
+    suspend fun fetchFeed(urls: List<String>, sourceId: String?): Result<List<NewsArticle>> = withContext(Dispatchers.IO) {
+        var lastFailure: Result<List<NewsArticle>>? = null
+        for (url in urls) {
+            val result = fetchSingleFeed(url, sourceId)
+            if (result.isSuccess && result.getOrNull()?.isNotEmpty() == true) return@withContext result
+            lastFailure = result
+        }
+        lastFailure ?: Result.failure(Exception("Sin URL de feed"))
+    }
+
+    private suspend fun fetchSingleFeed(url: String, sourceId: String?): Result<List<NewsArticle>> = withContext(Dispatchers.IO) {
         try {
-            val request = Request.Builder().url(url).get().build()
+            // Algunos medios (reportado con La Razón) rechazan o cortan la
+            // respuesta a peticiones sin cabeceras de navegador, tratándolas
+            // como bots: sin esto, esa fuente en concreto podía fallar aunque
+            // la URL del feed fuera correcta.
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Linux; Android 13; Mi Radio App) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36")
+                .header("Accept", "application/rss+xml, application/xml, text/xml, */*")
+                .get()
+                .build()
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@withContext Result.failure(Exception("HTTP ${response.code}"))
                 val body = response.body?.string()

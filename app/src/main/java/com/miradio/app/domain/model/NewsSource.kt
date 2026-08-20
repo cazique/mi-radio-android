@@ -25,7 +25,13 @@ data class NewsSource(
     val label: String,
     val feedUrl: String,
     val isCustom: Boolean = false,
+    /** URL de respaldo a probar, en orden, si [feedUrl] deja de responder:
+     *  algunos medios cambian la ruta de su RSS sin aviso y sin esto la
+     *  fuente se queda rota hasta que alguien actualice la URL a mano. */
+    val fallbackUrls: List<String> = emptyList(),
 ) {
+    val allFeedUrls: List<String> get() = listOf(feedUrl) + fallbackUrls
+
     companion object {
         const val FOR_YOU_ID = "para_ti"
 
@@ -55,7 +61,15 @@ object PresetNewsSources {
     val all: List<NewsSource> = listOf(
         NewsSource(id = "preset_elmundo", label = "El Mundo", feedUrl = "https://e00-elmundo.uecdn.es/elmundo/rss/portada.xml"),
         NewsSource(id = "preset_abc", label = "ABC", feedUrl = "https://www.abc.es/rss/feeds/abcPortada.xml"),
-        NewsSource(id = "preset_larazon", label = "La Razón", feedUrl = "https://www.larazon.es/rss/portada.xml"),
+        NewsSource(
+            id = "preset_larazon",
+            label = "La Razón",
+            feedUrl = "https://www.larazon.es/rss/portada.xml",
+            fallbackUrls = listOf(
+                "https://www.larazon.es/feed/",
+                "https://www.larazon.es/rss/",
+            ),
+        ),
         NewsSource(id = "preset_okdiario", label = "OKDiario", feedUrl = "https://okdiario.com/feed"),
     )
 }

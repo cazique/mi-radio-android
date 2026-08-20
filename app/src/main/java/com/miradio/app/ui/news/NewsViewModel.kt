@@ -233,7 +233,7 @@ class NewsViewModel(
         }
         isLoading.value = true
         viewModelScope.launch {
-            container.newsRepository.fetchFeed(newSource.feedUrl, newSource.id)
+            container.newsRepository.fetchFeed(newSource.allFeedUrls, newSource.id)
                 .onSuccess { articles ->
                     cache[newSource.id] = articles
                     articlesState.value = articles to null
@@ -267,7 +267,7 @@ class NewsViewModel(
                     val articles = if (existing != null && !forceReload) {
                         existing
                     } else {
-                        container.newsRepository.fetchFeed(source.feedUrl, source.id).getOrElse { emptyList() }
+                        container.newsRepository.fetchFeed(source.allFeedUrls, source.id).getOrElse { emptyList() }
                             .also { cache[source.id] = it }
                     }
                     source to articles

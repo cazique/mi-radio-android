@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -68,6 +69,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -79,8 +81,14 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import com.miradio.app.domain.model.NewsArticle
 import com.miradio.app.domain.model.NewsSource
+import com.miradio.app.domain.model.NewspaperCover
+import com.miradio.app.domain.model.NewspaperCovers
+import com.miradio.app.domain.model.NewspaperCategory
+import com.miradio.app.domain.model.searchFallbackUrl
+import com.miradio.app.domain.model.todayImageUrl
 import com.miradio.app.util.NewsTts
 import com.miradio.app.util.parseRssPubDateMillis
 import java.text.SimpleDateFormat
@@ -211,6 +219,9 @@ fun NewsScreen(
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(20.dp),
                     ) {
+                        if (state.selectedSource.id == NewsSource.FOR_YOU_ID) {
+                            item { PortadasSection() }
+                        }
                         items(state.articles, key = { it.link }) { article ->
                             val sourceLabel = if (state.selectedSource.id == NewsSource.FOR_YOU_ID) {
                                 state.sources.firstOrNull { it.id == article.sourceId }?.label ?: ""
@@ -337,69 +348,139 @@ private fun AddNewsSourceDialog(
     )
 }
 
-/**
- * Tarjeta grande y sencilla, con el mismo espíritu que el feed de noticias
- * del propio teléfono: foto a todo lo ancho y titular grande justo debajo,
- * sin más botones ni iconos que distraigan (pensado para que cualquiera,
- * sin experiencia con apps, sepa qué tocar).
- */
+/** Estilo "tarjeta grande con foto" tipo Spotify/YouTube Music: la imagen
+ *  ocupa toda la tarjeta y el titular va superpuesto abajo sobre un
+ *  degradado a negro, en vez de foto arriba y texto aparte debajo. */
 @Composable
 private fun NewsArticleCard(article: NewsArticle, sourceLabel: String, onClick: () -> Unit) {
     Card(
         onClick = onClick,
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
-        article.imageUrl?.let { url ->
-            AsyncImage(
-                model = url,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(16f / 10f),
-            )
-        }
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = article.title,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-            )
-            SourceMetaRow(sourceLabel = sourceLabel, pubDate = article.pubDate, modifier = Modifier.padding(top = 8.dp))
+        if (article.imageUrl != null) {
+            Box(modifier = Modifier.fillMaxWidth().aspectRatio(4f / 3f)) {
+                AsyncImage(
+                    model = article.imageUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                Box(
+                    modifier = Modifier.fillMaxSize().background(
+                        Brush.verticalGradient(
+                            0f to Color.Transparent,
+                            0.45f to Color.Black.copy(alpha = 0.35f),
+                            1f to Color.Black.copy(alpha = 0.92f),
+                        ),
+                    ),
+                )
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                ) {
+                    Text(
+                        text = article.title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    SourceMetaRow(
+                        sourceLabel = sourceLabel,
+                        pubDate = article.pubDate,
+                        articleLink = article.link,
+                        contentColor = Color.White.copy(alpha = 0.85f),
+                        modifier = Modifier.padding(top = 10.dp),
+                    )
+                }
+            }
+        } else {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    text = article.title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                SourceMetaRow(
+                    sourceLabel = sourceLabel,
+                    pubDate = article.pubDate,
+                    articleLink = article.link,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
         }
     }
 }
 
-/** Medio (con un distintivo de color, sin depender de descargar el logo de
- *  cada página) + fecha y hora, en una sola línea compacta: lo justo para
- *  identificar de un vistazo de dónde viene una noticia sin ocupar más
- *  espacio que un renglón de texto normal. */
+/** Medio (con el icono real del sitio cuando se consigue cargar, para poder
+ *  reconocer de un vistazo si es El Mundo, ABC, etc. y no solo una letra
+ *  de color) + fecha y hora, en una sola línea compacta. */
 @Composable
-private fun SourceMetaRow(sourceLabel: String, pubDate: String?, modifier: Modifier = Modifier) {
+private fun SourceMetaRow(
+    sourceLabel: String,
+    pubDate: String?,
+    articleLink: String?,
+    contentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    modifier: Modifier = Modifier,
+) {
     val text = listOfNotNull(sourceLabel.takeIf { it.isNotBlank() }, formatArticleDate(pubDate)).joinToString(" · ")
     if (sourceLabel.isBlank() && text.isBlank()) return
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         if (sourceLabel.isNotBlank()) {
-            Box(
-                modifier = Modifier.size(18.dp).clip(CircleShape).background(sourceBadgeColor(sourceLabel)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = sourceLabel.first().uppercaseChar().toString(),
-                    color = Color.White,
-                    fontSize = 10.sp,
-                    style = MaterialTheme.typography.labelSmall,
-                )
-            }
+            SourceIcon(sourceLabel = sourceLabel, articleLink = articleLink, modifier = Modifier.size(18.dp))
         }
         if (text.isNotBlank()) {
-            Text(text = text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(text = text, style = MaterialTheme.typography.bodyMedium, color = contentColor)
         }
     }
 }
+
+/** Icono del medio: intenta el favicon real del dominio de la noticia (así
+ *  se reconoce el periódico, no solo un color) y, si no carga, cae en una
+ *  insignia con la inicial del nombre en vez de dejar un hueco vacío. */
+@Composable
+private fun SourceIcon(sourceLabel: String, articleLink: String?, modifier: Modifier = Modifier) {
+    val faviconUrl = remember(articleLink) { articleLink?.let { faviconUrlFor(it) } }
+    Box(
+        modifier = modifier.clip(CircleShape).background(sourceBadgeColor(sourceLabel)),
+        contentAlignment = Alignment.Center,
+    ) {
+        val initial = @Composable {
+            Text(
+                text = sourceLabel.first().uppercaseChar().toString(),
+                color = Color.White,
+                fontSize = 10.sp,
+                style = MaterialTheme.typography.labelSmall,
+            )
+        }
+        if (faviconUrl != null) {
+            SubcomposeAsyncImage(
+                model = faviconUrl,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                loading = { initial() },
+                error = { initial() },
+            )
+        } else {
+            initial()
+        }
+    }
+}
+
+/** El favicon de cada medio (google.com/s2/favicons) se pide a partir del
+ *  dominio de la propia noticia, no del feed: así funciona igual en "Para
+ *  ti" (donde se mezclan varios medios) sin tener que ir a buscar la fuente
+ *  original de cada artículo. */
+private fun faviconUrlFor(articleLink: String): String? =
+    runCatching { Uri.parse(articleLink).host }.getOrNull()
+        ?.takeIf { it.isNotBlank() }
+        ?.let { host -> "https://www.google.com/s2/favicons?sz=64&domain=$host" }
 
 private val SOURCE_BADGE_COLORS = listOf(
     Color(0xFF2E9B5C), Color(0xFF3B6FD4), Color(0xFFD46A3B),
@@ -410,6 +491,119 @@ private val SOURCE_BADGE_COLORS = listOf(
  *  reconocerlo de un vistazo entre noticias sin tener que leer el texto. */
 private fun sourceBadgeColor(label: String): Color =
     SOURCE_BADGE_COLORS[label.hashCode().mod(SOURCE_BADGE_COLORS.size)]
+
+/** Fila horizontal con las portadas del día de la prensa nacional y
+ *  deportiva (kiosko.net): "mejor esfuerzo" ajeno a la app, así que cada
+ *  miniatura que no cargue simplemente no se muestra en vez de romper la
+ *  sección entera. */
+@Composable
+private fun PortadasSection() {
+    Column(modifier = Modifier.padding(bottom = 4.dp)) {
+        Text(
+            text = "Portadas de hoy",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            text = "Prensa nacional",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
+        )
+        PortadasRow(NewspaperCovers.all.filter { it.category == NewspaperCategory.NACIONAL })
+        Text(
+            text = "Deportes",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
+        )
+        PortadasRow(NewspaperCovers.all.filter { it.category == NewspaperCategory.DEPORTIVO })
+    }
+}
+
+@Composable
+private fun PortadasRow(covers: List<NewspaperCover>) {
+    var expanded by remember { mutableStateOf<NewspaperCover?>(null) }
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        items(covers, key = { it.code }) { cover ->
+            NewspaperCoverTile(cover = cover, onClick = { expanded = cover })
+        }
+    }
+    expanded?.let { cover ->
+        NewspaperCoverDialog(cover = cover, onDismiss = { expanded = null })
+    }
+}
+
+@Composable
+private fun NewspaperCoverTile(cover: NewspaperCover, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier.width(96.dp).clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        SubcomposeAsyncImage(
+            model = cover.todayImageUrl(),
+            contentDescription = cover.name,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(0.72f)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            loading = { CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp) },
+            error = {
+                Icon(
+                    Icons.Filled.Newspaper,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+        )
+        Text(
+            text = cover.name,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+    }
+}
+
+@Composable
+private fun NewspaperCoverDialog(cover: NewspaperCover, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(cover.name) },
+        text = {
+            SubcomposeAsyncImage(
+                model = cover.todayImageUrl(),
+                contentDescription = cover.name,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxWidth(),
+                loading = { Box(modifier = Modifier.fillMaxWidth().height(300.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } },
+                error = {
+                    Box(modifier = Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
+                        Text(
+                            "No se ha podido cargar la miniatura ahora mismo.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                },
+            )
+        },
+        confirmButton = {
+            Button(onClick = {
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(cover.searchFallbackUrl())))
+                onDismiss()
+            }) { Text("Buscar en el navegador") }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) { Text("Cerrar") }
+        },
+    )
+}
 
 /** Detalle a pantalla completa: título, foto e íntegro el resumen del RSS,
  *  con la opción (nunca obligatoria) de abrir la noticia completa en el
@@ -500,7 +694,12 @@ private fun NewsDetailDialog(article: NewsArticle, sourceLabel: String, onDismis
                         ),
                         fontWeight = FontWeight.Bold,
                     )
-                    SourceMetaRow(sourceLabel = sourceLabel, pubDate = article.pubDate, modifier = Modifier.padding(top = 6.dp, bottom = 4.dp))
+                    SourceMetaRow(
+                        sourceLabel = sourceLabel,
+                        pubDate = article.pubDate,
+                        articleLink = article.link,
+                        modifier = Modifier.padding(top = 6.dp, bottom = 4.dp),
+                    )
                     Button(
                         onClick = {
                             if (isSpeaking) {
