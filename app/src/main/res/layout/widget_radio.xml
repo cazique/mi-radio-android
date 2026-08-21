@@ -2,7 +2,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/widget_background"
+    android:background="@drawable/widget_card_background"
     android:orientation="horizontal"
     android:padding="12dp"
     android:gravity="center_vertical">
@@ -45,12 +45,12 @@
     </LinearLayout>
 
     <ImageButton
-        android:id="@+id/widget_next"
+        android:id="@+id/widget_previous"
         android:layout_width="40dp"
         android:layout_height="40dp"
         android:background="@android:color/transparent"
-        android:src="@drawable/ic_skip_next"
-        android:contentDescription="@string/cd_next_station" />
+        android:src="@drawable/ic_skip_previous"
+        android:contentDescription="@string/cd_previous_station" />
 
     <ImageButton
         android:id="@+id/widget_play_pause"
@@ -60,5 +60,14 @@
         android:background="@android:color/transparent"
         android:src="@drawable/ic_play"
         android:contentDescription="@string/cd_play" />
+
+    <ImageButton
+        android:id="@+id/widget_next"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginStart="4dp"
+        android:background="@android:color/transparent"
+        android:src="@drawable/ic_skip_next"
+        android:contentDescription="@string/cd_next_station" />
 
 </LinearLayout>

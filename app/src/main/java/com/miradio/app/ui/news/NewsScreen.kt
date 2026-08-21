@@ -546,12 +546,19 @@ private fun PortadasRow(covers: List<NewspaperCover>) {
 
 @Composable
 private fun NewspaperCoverTile(cover: NewspaperCover, onClick: () -> Unit) {
+    val context = LocalContext.current
+    val imageRequest = remember(cover) {
+        coil.request.ImageRequest.Builder(context)
+            .data(cover.todayImageUrl())
+            .headers(ImageSaver.HOTLINK_PROTECTED_IMAGE_HEADERS)
+            .build()
+    }
     Column(
         modifier = Modifier.width(150.dp).clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         SubcomposeAsyncImage(
-            model = cover.todayImageUrl(),
+            model = imageRequest,
             contentDescription = cover.name,
             contentScale = ContentScale.Crop,
             modifier = Modifier
@@ -597,7 +604,7 @@ private fun NewspaperCoverDialog(cover: NewspaperCover, onDismiss: () -> Unit) {
     var offset by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
 
     LaunchedEffect(cover) {
-        val result = ImageSaver.downloadBitmap(context, cover.todayImageUrl())
+        val result = ImageSaver.downloadBitmap(context, cover.todayImageUrl(), ImageSaver.HOTLINK_PROTECTED_IMAGE_HEADERS)
         bitmap = result
         loadFailed = result == null
     }
@@ -897,6 +904,19 @@ private fun BulletinCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
+                // Se enseña la hora que trae el feed (aunque no siempre se
+                // pueda confiar en que sea la más reciente de verdad): así se
+                // puede comprobar de un vistazo qué boletín cree la app que
+                // es el último, en vez de tener que abrirlo para saberlo.
+                if (!isLoading) {
+                    formatArticleDate(bulletin?.pubDate)?.let { dateText ->
+                        Text(
+                            text = dateText,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
+                        )
+                    }
+                }
             }
             if (isLoading) {
                 CircularProgressIndicator(modifier = Modifier.size(32.dp), strokeWidth = 3.dp)

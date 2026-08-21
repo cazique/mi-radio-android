@@ -12,6 +12,7 @@ import coil.imageLoader
 import coil.request.ImageRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.Headers
 import java.io.File
 import java.io.FileOutputStream
 
@@ -23,9 +24,21 @@ import java.io.FileOutputStream
  */
 object ImageSaver {
 
-    suspend fun downloadBitmap(context: Context, url: String): Bitmap? = withContext(Dispatchers.IO) {
+    /** Muchos sitios de imágenes (kiosko.net incluido, al parecer) bloquean
+     *  con 403 las peticiones que no parezcan venir de un navegador
+     *  navegando su propia web ("hotlink protection"): sin un User-Agent de
+     *  navegador y un Referer de su dominio, la imagen no carga aunque la
+     *  URL sea correcta. Mismo tipo de problema que ya se vio con el RSS de
+     *  La Razón. */
+    val HOTLINK_PROTECTED_IMAGE_HEADERS: Headers = Headers.Builder()
+        .add("User-Agent", "Mozilla/5.0 (Linux; Android 13; Mi Radio App) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36")
+        .add("Referer", "https://kiosko.net/")
+        .build()
+
+    suspend fun downloadBitmap(context: Context, url: String, headers: Headers? = null): Bitmap? = withContext(Dispatchers.IO) {
         val request = ImageRequest.Builder(context)
             .data(url)
+            .apply { if (headers != null) headers(headers) }
             // Bitmap "de software": el guardado/compartido necesita poder
             // leer los píxeles directamente, cosa que un bitmap hardware
             // (el que usa Coil normalmente por eficiencia) no permite.

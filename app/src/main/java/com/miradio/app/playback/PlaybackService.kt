@@ -281,6 +281,7 @@ class PlaybackService : MediaSessionService() {
         when (intent?.action) {
             ACTION_TOGGLE_PLAY_PAUSE -> handleTogglePlayPause()
             ACTION_NEXT_STATION -> handleNextStation()
+            ACTION_PREVIOUS_STATION -> handlePreviousStation()
         }
         return super.onStartCommand(intent, flags, startId)
     }
@@ -388,6 +389,7 @@ class PlaybackService : MediaSessionService() {
     companion object {
         const val ACTION_TOGGLE_PLAY_PAUSE = "com.miradio.app.action.TOGGLE_PLAY_PAUSE"
         const val ACTION_NEXT_STATION = "com.miradio.app.action.NEXT_STATION"
+        const val ACTION_PREVIOUS_STATION = "com.miradio.app.action.PREVIOUS_STATION"
     }
 }
 

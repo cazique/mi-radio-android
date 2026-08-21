@@ -76,7 +76,25 @@ class NewsRepository(private val context: Context) {
      *  como antes, en vez de fallar. */
     suspend fun fetchLatestBulletin(): Result<NewsArticle?> =
         fetchFeed(BULLETIN_FEED_URL).map { articles ->
-            articles.maxByOrNull { parseRssPubDateMillis(it.pubDate) ?: Long.MIN_VALUE }
+            val withParsedDate = articles.mapNotNull { article ->
+                parseRssPubDateMillis(article.pubDate)?.let { article to it }
+            }
+            if (withParsedDate.isEmpty() && articles.isNotEmpty()) {
+                // Si ninguna fecha se ha podido interpretar, maxByOrNull con
+                // un valor de reserva igual para todos volvería a devolver
+                // sin querer el primer elemento (el mismo fallo de siempre:
+                // "el boletín siempre es el de las 2"). Se deja constancia
+                // de las fechas en crudo para poder ampliar los formatos de
+                // RssDates la próxima vez, en vez de repetir ese fallo en
+                // silencio.
+                DiagnosticsLog.log(
+                    context,
+                    "NewsRepository",
+                    "Boletín: ninguna fecha reconocida, pubDate en crudo: " +
+                        articles.take(5).joinToString(" | ") { it.pubDate ?: "(vacío)" },
+                )
+            }
+            withParsedDate.maxByOrNull { it.second }?.first ?: articles.firstOrNull()
         }
 
     private fun parseRss(xml: String, sourceId: String?): List<NewsArticle> {

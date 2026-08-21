@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_card_background">
+
+    <ImageView
+        android:id="@+id/widget_compact_logo"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:background="@drawable/widget_logo_placeholder"
+        android:contentDescription="@string/cd_station_logo" />
+
+    <TextView
+        android:id="@+id/widget_compact_station_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:background="#66000000"
+        android:padding="8dp"
+        android:text="@string/widget_no_station"
+        android:textColor="#FFFFFF"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <ImageButton
+        android:id="@+id/widget_compact_play_pause"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="8dp"
+        android:background="@drawable/widget_play_button_background"
+        android:src="@drawable/ic_play"
+        android:contentDescription="@string/cd_play" />
+
+</FrameLayout>

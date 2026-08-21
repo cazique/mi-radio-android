@@ -11,8 +11,12 @@ import java.util.Locale
 private val RSS_DATE_PATTERNS = listOf(
     "EEE, dd MMM yyyy HH:mm:ss Z",
     "EEE, dd MMM yyyy HH:mm:ss zzz",
+    "EEE, dd MMM yyyy HH:mm Z",
+    "dd MMM yyyy HH:mm:ss Z",
     "yyyy-MM-dd'T'HH:mm:ssXXX",
+    "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
     "yyyy-MM-dd'T'HH:mm:ss'Z'",
+    "yyyy-MM-dd HH:mm:ss",
 )
 
 /** Milisegundos desde época a partir de un `pubDate` de RSS, o null si viene

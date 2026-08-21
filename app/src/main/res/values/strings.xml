@@ -108,6 +108,7 @@
 
     <!-- Widget -->
     <string name="widget_description">Muestra la emisora actual y permite reproducir/pausar y cambiar de emisora.</string>
+    <string name="widget_compact_description">Logo grande de la emisora actual con botón de reproducir/pausar, para el hueco justo de un icono.</string>
     <string name="widget_no_station">Sin emisora</string>
 
     <!-- Accesibilidad -->
