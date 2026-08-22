@@ -1,17 +1,13 @@
 package com.miradio.app.domain.model
 
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-
 enum class NewspaperCategory { NACIONAL, DEPORTIVO }
 
 /**
- * Portada de un periódico para la sección "Portadas de hoy": no se guarda
- * ninguna imagen propia, se compone la URL de la portada del día a partir
- * del código del medio en kiosko.net (agregador público de portadas de
- * prensa española). Si algún código deja de coincidir, esa portada
- * simplemente no carga su miniatura (fallo aislado, ver [NewspaperCoverTile]).
+ * Portada de un periódico para la sección "Portadas de hoy". No se hotlinkea
+ * ninguna imagen de un agregador externo (se intentó con kiosko.net y
+ * siguió sin cargar, sin forma de comprobar por qué desde este entorno sin
+ * red): la portada de verdad se muestra en un navegador embebido dentro de
+ * la propia app (ver [NewspaperCoverDialog] en NewsScreen.kt).
  */
 data class NewspaperCover(
     val name: String,
@@ -34,18 +30,9 @@ object NewspaperCovers {
     )
 }
 
-/** kiosko.net publica cada portada del día como imagen en
- *  img.kiosko.net/AAAA/MM/DD/es/{codigo}.750.jpg. Es una convención de un
- *  sitio externo (no una API propia), así que puede fallar puntualmente:
- *  se trata siempre como "mejor esfuerzo", nunca como algo garantizado. */
-fun NewspaperCover.todayImageUrl(): String {
-    val datePath = SimpleDateFormat("yyyy/MM/dd", Locale.US).format(Date())
-    return "https://img.kiosko.net/$datePath/es/$code.750.jpg"
-}
-
-/** Búsqueda de imágenes siempre disponible como último recurso, por si la
- *  miniatura de kiosko.net no carga: no depende de conocer ninguna URL
- *  exacta del propio periódico, así que nunca lleva a un enlace roto. */
+/** Búsqueda de imágenes de la portada de hoy: siempre da algún resultado
+ *  real (a diferencia de adivinar la URL exacta de un agregador externo),
+ *  así que es la fuente principal de la portada, no un último recurso. */
 fun NewspaperCover.searchFallbackUrl(): String {
     val query = android.net.Uri.encode("portada $name hoy")
     return "https://www.google.com/search?tbm=isch&q=$query"
