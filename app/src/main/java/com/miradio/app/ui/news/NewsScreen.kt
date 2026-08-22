@@ -90,6 +90,7 @@ import com.miradio.app.domain.model.NewsSource
 import com.miradio.app.domain.model.NewspaperCover
 import com.miradio.app.domain.model.NewspaperCovers
 import com.miradio.app.domain.model.NewspaperCategory
+import com.miradio.app.domain.model.kioskoPageUrl
 import com.miradio.app.domain.model.searchFallbackUrl
 import com.miradio.app.util.NewsTts
 import com.miradio.app.util.parseRssPubDateMillis
