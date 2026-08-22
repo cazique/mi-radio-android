@@ -1,12 +1,18 @@
 package com.miradio.app.ui.news
 
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,11 +38,13 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.TextDecrease
 import androidx.compose.material.icons.filled.TextIncrease
@@ -67,12 +75,17 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -82,6 +95,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
@@ -91,9 +105,12 @@ import com.miradio.app.domain.model.NewspaperCover
 import com.miradio.app.domain.model.NewspaperCovers
 import com.miradio.app.domain.model.NewspaperCategory
 import com.miradio.app.domain.model.kioskoPageUrl
-import com.miradio.app.domain.model.searchFallbackUrl
+import com.miradio.app.util.ImageSaver
 import com.miradio.app.util.NewsTts
 import com.miradio.app.util.parseRssPubDateMillis
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -608,20 +625,66 @@ private fun NewspaperCoverTile(cover: NewspaperCover, onClick: () -> Unit) {
 private fun todayShortLabel(): String =
     SimpleDateFormat("d MMM", Locale("es", "ES")).format(java.util.Date())
 
-/** Muestra la portada de verdad dentro de la propia app: un navegador
- *  embebido que carga la página real de kiosko.net para este periódico (no
- *  una búsqueda de Google) — al ser el propio navegador quien la pide, con
- *  el referer y las cookies de kiosko.net, carga la imagen que un hotlink
- *  directo desde Coil/OkHttp no conseguía. Solo si esa página falla del
- *  todo se cae a una búsqueda de imágenes, para no dejar la pantalla vacía.
- *  Incluye abrir en el navegador del teléfono para guardar o compartir con
- *  sus propias herramientas (mantener pulsada la imagen). */
+/** Script que busca la imagen más grande realmente pintada en la página
+ *  (no una adivinada por su URL): en la portada de kiosko.net de un
+ *  periódico, esa siempre es la propia portada. Se ejecuta con
+ *  evaluateJavascript tras dar tiempo a que la página cargue sus <img>. */
+private const val LARGEST_IMAGE_JS = """
+(function() {
+    var imgs = document.querySelectorAll('img');
+    var best = null, bestArea = 0;
+    for (var i = 0; i < imgs.length; i++) {
+        var im = imgs[i];
+        var w = im.naturalWidth || im.width || 0;
+        var h = im.naturalHeight || im.height || 0;
+        var area = w * h;
+        if (area > bestArea) { bestArea = area; best = im; }
+    }
+    best ? best.src : '';
+})();
+"""
+
+/** Descarga de verdad la portada (no solo la muestra en un navegador
+ *  embebido): se carga la página real de kiosko.net de este periódico en un
+ *  WebView invisible, se saca de su DOM ya cargado la URL de la imagen más
+ *  grande (la propia portada), y se descarga esa URL con OkHttp/Coil con el
+ *  referer de esa misma página (y su cookie de sesión, si dejó alguna) —
+ *  así se pide igual que la pediría un navegador de verdad, que es
+ *  justamente lo que un hotlink directo sin ese contexto no conseguía. Con
+ *  la imagen ya descargada se puede ver con zoom, guardar en la galería y
+ *  compartir. Si la extracción o la descarga fallan, se cae a mostrar la
+ *  página de kiosko.net tal cual dentro de la app. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NewspaperCoverDialog(cover: NewspaperCover, onDismiss: () -> Unit) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val pageUrl = remember(cover) { cover.kioskoPageUrl() }
-    var currentUrl by remember(cover) { mutableStateOf(pageUrl) }
+    var bitmap by remember(cover) { mutableStateOf<Bitmap?>(null) }
+    var showWebViewFallback by remember(cover) { mutableStateOf(false) }
+    var isBusy by remember { mutableStateOf(false) }
+    var scale by remember { mutableStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+
+    fun feedback(ok: Boolean, successMessage: String) {
+        Toast.makeText(context, if (ok) successMessage else "No se ha podido completar la operación.", Toast.LENGTH_SHORT).show()
+    }
+
+    fun saveCover(target: Bitmap) {
+        scope.launch {
+            isBusy = true
+            val ok = ImageSaver.saveToGallery(context, target, "portada_${cover.code}_${System.currentTimeMillis()}")
+            isBusy = false
+            feedback(ok, "Portada guardada en la galería.")
+        }
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        val target = bitmap
+        if (granted && target != null) saveCover(target) else if (!granted) feedback(false, "")
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -635,39 +698,127 @@ private fun NewspaperCoverDialog(cover: NewspaperCover, onDismiss: () -> Unit) {
                         IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null) }
                     },
                     actions = {
-                        IconButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(currentUrl))) }) {
+                        if (!showWebViewFallback) {
+                            IconButton(
+                                onClick = { bitmap?.let { scope.launch { ImageSaver.shareImage(context, it, "portada_${cover.code}") } } },
+                                enabled = bitmap != null && !isBusy,
+                            ) {
+                                Icon(Icons.Filled.Share, contentDescription = "Compartir portada")
+                            }
+                            IconButton(
+                                onClick = {
+                                    val target = bitmap ?: return@IconButton
+                                    if (ImageSaver.needsWritePermission() &&
+                                        ContextCompat.checkSelfPermission(context, android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+                                    ) {
+                                        permissionLauncher.launch(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                                    } else {
+                                        saveCover(target)
+                                    }
+                                },
+                                enabled = bitmap != null && !isBusy,
+                            ) {
+                                Icon(Icons.Filled.Download, contentDescription = "Guardar portada")
+                            }
+                        }
+                        IconButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(pageUrl))) }) {
                             Icon(Icons.Filled.OpenInBrowser, contentDescription = "Abrir en el navegador")
                         }
                     },
                 )
             },
+            containerColor = Color.Black,
         ) { padding ->
-            AndroidView(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                factory = { viewContext ->
-                    android.webkit.WebView(viewContext).apply {
-                        settings.javaScriptEnabled = true
-                        settings.domStorageEnabled = true
-                        webViewClient = object : android.webkit.WebViewClient() {
-                            override fun onReceivedError(
-                                view: android.webkit.WebView,
-                                request: android.webkit.WebResourceRequest,
-                                error: android.webkit.WebResourceError,
-                            ) {
-                                if (request.isForMainFrame && currentUrl == pageUrl) {
-                                    currentUrl = cover.searchFallbackUrl()
-                                    view.loadUrl(currentUrl)
+            Box(modifier = Modifier.fillMaxSize().padding(padding).background(Color.Black)) {
+                // El WebView vive siempre (hace falta para la extracción), pero
+                // solo se ve (a tamaño completo) si hay que caer al respaldo;
+                // mientras tanto queda a tamaño 0 cargando en segundo plano.
+                AndroidView(
+                    modifier = if (showWebViewFallback) Modifier.fillMaxSize() else Modifier.size(0.dp),
+                    factory = { viewContext ->
+                        android.webkit.WebView(viewContext).apply {
+                            settings.javaScriptEnabled = true
+                            settings.domStorageEnabled = true
+                            // onPageFinished puede llegar más de una vez (p. ej.
+                            // si hay una redirección de por medio antes del
+                            // contenido final): sin esta guarda se lanzaría la
+                            // extracción y la descarga más de una vez.
+                            var attempted = false
+                            webViewClient = object : android.webkit.WebViewClient() {
+                                override fun onPageFinished(view: android.webkit.WebView, url: String?) {
+                                    if (attempted) return
+                                    attempted = true
+                                    // Margen para que las imágenes (sobre todo si
+                                    // la portada se carga de forma perezosa)
+                                    // terminen de aparecer antes de mirar el DOM.
+                                    view.postDelayed({
+                                        view.evaluateJavascript(LARGEST_IMAGE_JS) { rawResult ->
+                                            val imageUrl = rawResult
+                                                ?.trim('"')
+                                                ?.takeIf { it.isNotBlank() && it != "null" }
+                                                ?.replace("\\/", "/")
+                                            if (imageUrl == null) {
+                                                showWebViewFallback = true
+                                                return@evaluateJavascript
+                                            }
+                                            val cookie = android.webkit.CookieManager.getInstance().getCookie(pageUrl)
+                                            scope.launch(Dispatchers.IO) {
+                                                val downloaded = runCatching {
+                                                    ImageSaver.downloadBitmap(context, imageUrl, ImageSaver.hotlinkHeaders(pageUrl, cookie))
+                                                }.getOrNull()
+                                                withContext(Dispatchers.Main) {
+                                                    if (downloaded != null) bitmap = downloaded else showWebViewFallback = true
+                                                }
+                                            }
+                                        }
+                                    }, 700)
+                                }
+
+                                override fun onReceivedError(
+                                    view: android.webkit.WebView,
+                                    request: android.webkit.WebResourceRequest,
+                                    error: android.webkit.WebResourceError,
+                                ) {
+                                    if (request.isForMainFrame) showWebViewFallback = true
                                 }
                             }
+                            loadUrl(pageUrl)
                         }
-                        loadUrl(pageUrl)
-                    }
-                },
-                // Sin "update": se ejecuta en cada recomposición (p. ej. al
-                // rotar la pantalla o simplemente al redibujar la barra
-                // superior), y volver a cargar la URL ahí tiraba a la basura
-                // el scroll y el estado de la página cargada por "factory".
-            )
+                    },
+                    // Sin "update": volver a cargar la URL en cada recomposición
+                    // tiraría a la basura el scroll y el estado ya cargados.
+                )
+
+                when {
+                    bitmap != null -> Image(
+                        bitmap = bitmap!!.asImageBitmap(),
+                        contentDescription = cover.name,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .pointerInput(cover) {
+                                detectTransformGestures { _, pan, zoom, _ ->
+                                    val newScale = (scale * zoom).coerceIn(1f, 6f)
+                                    scale = newScale
+                                    offset = if (newScale <= 1f) Offset.Zero else offset + pan
+                                }
+                            }
+                            .graphicsLayer(
+                                scaleX = scale,
+                                scaleY = scale,
+                                translationX = offset.x,
+                                translationY = offset.y,
+                            ),
+                    )
+                    !showWebViewFallback -> CircularProgressIndicator(
+                        color = Color.White,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                }
+                if (isBusy) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.BottomCenter).padding(24.dp))
+                }
+            }
         }
     }
 }

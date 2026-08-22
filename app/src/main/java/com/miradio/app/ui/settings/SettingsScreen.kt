@@ -494,8 +494,27 @@ private fun ChangelogSection() {
     }
 }
 
+/**
+ * @param highlightFromId si se pasa (el WhatsNewPrompt de después de
+ * actualizar lo hace, con el último id visto), separa las entradas más
+ * nuevas que ese id en su propio bloque "Novedades de esta actualización"
+ * en vez de mezclarlas sin distinción con todo el historial: sin esto, cada
+ * vez que se abría el diálogo salía la lista entera de siempre, sin ninguna
+ * forma de saber qué era justo lo nuevo. También se ha quitado el "Versión
+ * N" que encabezaba cada entrada: N era un contador interno propio del
+ * changelog (ver Changelog.kt), sin relación alguna con el número de
+ * versión real que se ve en Ajustes ("1.0.0-buildNN"), así que solo
+ * confundía sin decir nada útil.
+ */
 @Composable
-fun ChangelogDialog(onDismiss: () -> Unit) {
+fun ChangelogDialog(onDismiss: () -> Unit, highlightFromId: Int? = null) {
+    val newEntries = if (highlightFromId != null) {
+        com.miradio.app.util.Changelog.entries.filter { it.id > highlightFromId }
+    } else {
+        emptyList()
+    }
+    val olderEntries = com.miradio.app.util.Changelog.entries.filter { it !in newEntries }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Novedades") },
@@ -504,27 +523,40 @@ fun ChangelogDialog(onDismiss: () -> Unit) {
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
-                com.miradio.app.util.Changelog.entries.forEach { entry ->
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(
-                            text = "Versión ${entry.id} · ${entry.title}",
-                            style = MaterialTheme.typography.titleSmall,
-                        )
-                        entry.bullets.forEach { bullet ->
-                            Text(
-                                text = "•  $bullet",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
+                if (newEntries.isNotEmpty()) {
+                    Text(
+                        text = "Novedades de esta actualización",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    newEntries.forEach { ChangelogEntryBlock(it) }
+                    Text(
+                        text = "Anteriores",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
+                olderEntries.forEach { ChangelogEntryBlock(it) }
             }
         },
         confirmButton = {
             Button(onClick = onDismiss) { Text("Cerrar") }
         },
     )
+}
+
+@Composable
+private fun ChangelogEntryBlock(entry: com.miradio.app.util.ChangelogEntry) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(text = entry.title, style = MaterialTheme.typography.titleSmall)
+        entry.bullets.forEach { bullet ->
+            Text(
+                text = "•  $bullet",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
 }
 
 /**

@@ -205,14 +205,19 @@ private fun WhatsNewPrompt() {
     val container = (context.applicationContext as RadioApp).container
     val scope = rememberCoroutineScope()
     var showDialog by remember { mutableStateOf(false) }
+    var lastSeenId by remember { mutableStateOf(Changelog.latestId) }
 
     LaunchedEffect(Unit) {
         val lastSeen = container.preferencesRepository.lastSeenChangelogId.first()
-        if (lastSeen < Changelog.latestId) showDialog = true
+        if (lastSeen < Changelog.latestId) {
+            lastSeenId = lastSeen
+            showDialog = true
+        }
     }
 
     if (showDialog) {
         ChangelogDialog(
+            highlightFromId = lastSeenId,
             onDismiss = {
                 showDialog = false
                 scope.launch { container.preferencesRepository.setLastSeenChangelogId(Changelog.latestId) }
