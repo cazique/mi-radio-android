@@ -76,8 +76,19 @@ class NewsRepository(private val context: Context) {
      *  como antes, en vez de fallar. */
     suspend fun fetchLatestBulletin(): Result<NewsArticle?> =
         fetchFeed(BULLETIN_FEED_URL).map { articles ->
+            // Reportado con captura: el título decía "boletín 02:00" pero la
+            // fecha mostrada era de semanas después, en el futuro. Un pubDate
+            // en el futuro no puede ser de verdad "el más reciente" (o el
+            // reloj del móvil está mal, o el propio feed trae un dato roto
+            // para ese elemento): se descarta como candidato a "más nuevo"
+            // en vez de dejar que gane por tener la fecha numéricamente más
+            // alta, igual que antes se descartaba una fecha sin interpretar.
+            val now = System.currentTimeMillis()
+            val maxFuture = now + TimeUnit.HOURS.toMillis(6)
             val withParsedDate = articles.mapNotNull { article ->
-                parseRssPubDateMillis(article.pubDate)?.let { article to it }
+                parseRssPubDateMillis(article.pubDate)
+                    ?.takeIf { it <= maxFuture }
+                    ?.let { article to it }
             }
             if (withParsedDate.isEmpty() && articles.isNotEmpty()) {
                 // Si ninguna fecha se ha podido interpretar, maxByOrNull con
