@@ -25,7 +25,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,7 +46,7 @@ fun AlarmsScreen(
     onEditAlarm: (Long) -> Unit,
     viewModel: AlarmsViewModel = viewModel(factory = AlarmsViewModel.Factory),
 ) {
-    val alarms by viewModel.alarms.collectAsState()
+    val alarms by viewModel.alarms.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {

@@ -146,7 +146,11 @@ fun RadioNavHost(navController: NavHostController = rememberNavController()) {
             arguments = listOf(navArgument("collectionId") { type = NavType.StringType }),
         ) { backStackEntry ->
             val collectionId = backStackEntry.arguments?.getString("collectionId").orEmpty()
-            PodcastEpisodesScreen(collectionId = collectionId, onBack = { navController.popBackStack() })
+            PodcastEpisodesScreen(
+                collectionId = collectionId,
+                onBack = { navController.popBackStack() },
+                onOpenPlayer = { navController.navigate(Routes.PLAYER) },
+            )
         }
     }
 }

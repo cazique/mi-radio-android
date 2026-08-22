@@ -20,13 +20,18 @@ const val EXTRA_ALARM_ID = "alarm_id"
  */
 object AlarmScheduler {
 
-    fun schedule(context: Context, alarm: AlarmEntity) {
+    /**
+     * @param triggerAtMillis instante exacto a usar en vez de recalcularlo
+     * con [nextTriggerTimeMillis]; lo usa BootReceiver para restaurar una
+     * posposición ("snooze") pendiente tal cual, sin recomponer la próxima
+     * hora "normal" de la alarma.
+     */
+    fun schedule(context: Context, alarm: AlarmEntity, triggerAtMillis: Long = nextTriggerTimeMillis(alarm)) {
         val alarmManager = context.getSystemService<AlarmManager>() ?: return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
             DiagnosticsLog.logWarning(context, "AlarmScheduler", "Sin permiso de alarmas exactas, no se programa la alarma ${alarm.id}")
             return
         }
-        val triggerAtMillis = nextTriggerTimeMillis(alarm)
         val pendingIntent = pendingIntentFor(context, alarm.id)
         alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
         DiagnosticsLog.log(

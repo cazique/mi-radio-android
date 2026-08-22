@@ -19,7 +19,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -73,16 +73,20 @@ class MainActivity : FragmentActivity() {
 
         setContent {
             val container = (application as RadioApp).container
-            val themeMode by container.preferencesRepository.themeMode.collectAsState(
-                initial = com.miradio.app.domain.model.ThemeMode.SYSTEM,
+            val themeMode by container.preferencesRepository.themeMode.collectAsStateWithLifecycle(
+                // El valor real por defecto (ver PreferencesRepository.themeMode) es
+                // DARK, no SYSTEM: usar SYSTEM aquí como semilla podía pintar un
+                // primer frame claro/oscuro equivocado en cuanto el sistema no
+                // fuera oscuro, antes de que llegara la primera lectura real.
+                initialValue = com.miradio.app.domain.model.ThemeMode.DARK,
             )
             // Escala de texto propia de Ajustes, independiente del tamaño de
             // letra del sistema: se sustituye por completo el fontScale de la
             // densidad de Compose en vez de multiplicarlo, para que no se
             // sume con el ajuste de accesibilidad de Android.
-            val textScale by container.preferencesRepository.textScale.collectAsState(initial = 1f)
-            val simpleMode by container.preferencesRepository.simpleMode.collectAsState(initial = false)
-            val dynamicColor by container.preferencesRepository.dynamicColorEnabled.collectAsState(initial = false)
+            val textScale by container.preferencesRepository.textScale.collectAsStateWithLifecycle(initialValue = 1f)
+            val simpleMode by container.preferencesRepository.simpleMode.collectAsStateWithLifecycle(initialValue = false)
+            val dynamicColor by container.preferencesRepository.dynamicColorEnabled.collectAsStateWithLifecycle(initialValue = false)
             val density = LocalDensity.current
 
             MiRadioTheme(themeMode = themeMode, dynamicColor = dynamicColor) {
@@ -228,14 +232,14 @@ private fun MiRadioApp(simpleMode: Boolean) {
     // "hoisted"): se observa aquí, en el único sitio donde vive, y se le
     // pasa ya resuelto. radioPlayer es null hasta que el servicio arranca
     // (p. ej. justo al abrir la app), de ahí el estado por defecto.
-    val radioPlayer by PlaybackServiceConnector.player.collectAsState()
+    val radioPlayer by PlaybackServiceConnector.player.collectAsStateWithLifecycle()
     // remember() siempre se llama (nunca dentro del ?:): condicionarlo a
     // que radioPlayer sea null podía saltárselo entero en la recomposición
     // en la que el servicio termina de conectar (null -> no null), lo que
     // descuadra la posición del resto de remember de esta composición (el
     // fallo real de Compose que solo se nota más tarde, y no siempre aquí).
     val fallbackUiState = remember { MutableStateFlow(PlayerUiState()) }
-    val miniPlayerState by (radioPlayer?.uiState ?: fallbackUiState).collectAsState()
+    val miniPlayerState by (radioPlayer?.uiState ?: fallbackUiState).collectAsStateWithLifecycle()
 
     Scaffold(
         bottomBar = {

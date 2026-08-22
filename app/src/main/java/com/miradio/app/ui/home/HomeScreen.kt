@@ -30,7 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
@@ -61,7 +61,7 @@ fun HomeScreen(
     onOpenSettings: () -> Unit,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(showFavoritesOnly) {
         viewModel.setShowFavoritesOnly(showFavoritesOnly)
@@ -151,7 +151,13 @@ fun HomeScreen(
 
             if (isBrowsingAll) {
                 groups.forEach { (region, stationsInRegion) ->
-                    val expanded = expandedRegions[region] ?: true
+                    // El comentario de arriba ya avisaba de que tenerlas todas
+                    // abiertas de golpe (con ~985 emisoras en el catálogo
+                    // nacional) hace la lista interminable; el "?: true" de
+                    // aquí contradecía justo eso, mostrando cada región
+                    // desplegada desde el primer render en vez de solo sus
+                    // cabeceras.
+                    val expanded = expandedRegions[region] ?: false
                     stickyHeader(key = region) {
                         RegionHeader(
                             region = region,

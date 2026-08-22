@@ -63,7 +63,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -111,7 +111,7 @@ fun NewsScreen(
     onOpenSettings: () -> Unit,
     viewModel: NewsViewModel = viewModel(factory = NewsViewModel.Factory),
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedArticle by remember { mutableStateOf<NewsArticle?>(null) }
     var showAddSourceDialog by remember { mutableStateOf(false) }
 
@@ -261,7 +261,7 @@ fun NewsScreen(
     }
 
     if (showAddSourceDialog) {
-        val addState by viewModel.addSourceState.collectAsState()
+        val addState by viewModel.addSourceState.collectAsStateWithLifecycle()
         var hasSubmitted by remember { mutableStateOf(false) }
         // Se cierra sola en cuanto la comprobación termina bien: solo si ya
         // se había enviado el formulario (hasSubmitted), para no confundir
@@ -491,6 +491,21 @@ private fun faviconUrlFor(articleLink: String): String? =
         ?.takeIf { it.isNotBlank() }
         ?.let { host -> "https://www.google.com/s2/favicons?sz=64&domain=$host" }
 
+/** El link de un artículo viene de un feed RSS externo sin ningún control
+ *  sobre su contenido: abrirlo a ciegas con ACTION_VIEW permitiría a un feed
+ *  malicioso o comprometido colar un esquema "intent://" (u otro no-http/s)
+ *  para lanzar actividades arbitrarias del sistema en vez de solo abrir una
+ *  página web. Se valida el esquema antes de lanzar el Intent. */
+private fun openArticleLink(context: android.content.Context, link: String?) {
+    val uri = link?.let { runCatching { Uri.parse(it) }.getOrNull() }
+    if (uri == null || uri.scheme?.lowercase() !in setOf("http", "https")) {
+        Toast.makeText(context, "Enlace no válido", Toast.LENGTH_SHORT).show()
+        return
+    }
+    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
+        .onFailure { Toast.makeText(context, "No se ha podido abrir el enlace", Toast.LENGTH_SHORT).show() }
+}
+
 private val SOURCE_BADGE_COLORS = listOf(
     Color(0xFF2E9B5C), Color(0xFF3B6FD4), Color(0xFFD46A3B),
     Color(0xFF9B4FD4), Color(0xFFD43B7A), Color(0xFF3BAFD4),
@@ -632,7 +647,10 @@ private fun NewspaperCoverDialog(cover: NewspaperCover, onDismiss: () -> Unit) {
                         loadUrl(searchUrl)
                     }
                 },
-                update = { it.loadUrl(searchUrl) },
+                // Sin "update": se ejecuta en cada recomposición (p. ej. al
+                // rotar la pantalla o simplemente al redibujar la barra
+                // superior), y volver a cargar la URL ahí tiraba a la basura
+                // el scroll y el estado de la página cargada por "factory".
             )
         }
     }
@@ -653,8 +671,8 @@ private fun NewsDetailDialog(article: NewsArticle, sourceLabel: String, onDismis
     var textScale by remember { mutableStateOf(1.15f) }
 
     val tts = remember { NewsTts(context) }
-    val isSpeaking by tts.isSpeaking.collectAsState()
-    val ttsError by tts.error.collectAsState()
+    val isSpeaking by tts.isSpeaking.collectAsStateWithLifecycle()
+    val ttsError by tts.error.collectAsStateWithLifecycle()
     DisposableEffect(Unit) {
         onDispose { tts.shutdown() }
     }
@@ -760,9 +778,7 @@ private fun NewsDetailDialog(article: NewsArticle, sourceLabel: String, onDismis
                         )
                     }
                     OutlinedButton(
-                        onClick = {
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(article.link)))
-                        },
+                        onClick = { openArticleLink(context, article.link) },
                         modifier = Modifier.padding(top = 24.dp, bottom = 8.dp),
                     ) {
                         Icon(Icons.Filled.OpenInBrowser, contentDescription = null, modifier = Modifier.padding(end = 8.dp))

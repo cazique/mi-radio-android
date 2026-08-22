@@ -37,6 +37,22 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
+/**
+ * AlarmManager pierde toda alarma programada al reiniciar el móvil, así que
+ * BootReceiver las reprograma todas leyendo la tabla `alarms`; pero la
+ * posposición ("snooze") de AlarmRingingActivity solo tocaba AlarmManager en
+ * caliente, nunca la fila de la base de datos, así que un reinicio durante
+ * los minutos de posposición hacía que BootReceiver recalculara la próxima
+ * vez "normal" de la alarma en vez de la hora pospuesta, perdiéndola sin
+ * avisar. Esta columna deja constancia en la propia fila para que
+ * BootReceiver pueda recuperarla.
+ */
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `alarms` ADD COLUMN `snoozedUntilMillis` INTEGER")
+    }
+}
+
 // exportSchema = true: cada versión deja un JSON histórico en app/schemas/
 // (ver room.schemaLocation en app/build.gradle.kts), imprescindible para
 // poder escribir y probar migraciones reales de aquí en adelante.
@@ -53,7 +69,7 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
 // futuro en un cierre inmediato de la app para todo el mundo en vez de una
 // pérdida de datos silenciosa; ninguna de las dos es aceptable a la larga,
 // pero hay que resolverlo escribiendo la migración correspondiente, no aquí.
-@Database(entities = [StationEntity::class, AlarmEntity::class], version = 4, exportSchema = true)
+@Database(entities = [StationEntity::class, AlarmEntity::class], version = 5, exportSchema = true)
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun stationDao(): StationDao
@@ -70,7 +86,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "miradio.db",
                 )
-                    .addMigrations(MIGRATION_3_4)
+                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5)
                     .fallbackToDestructiveMigration()
                     .build().also { instance = it }
             }

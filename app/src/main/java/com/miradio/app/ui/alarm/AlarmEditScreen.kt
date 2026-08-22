@@ -42,7 +42,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -71,8 +71,8 @@ fun AlarmEditScreen(
     onBack: () -> Unit,
     viewModel: AlarmEditViewModel = viewModel(factory = AlarmEditViewModel.factory(alarmId)),
 ) {
-    val state by viewModel.state.collectAsState()
-    val stationResults by viewModel.stationResults.collectAsState()
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val stationResults by viewModel.stationResults.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var stationQuery by remember { mutableStateOf("") }
     var showExactAlarmExplainer by remember { mutableStateOf(false) }

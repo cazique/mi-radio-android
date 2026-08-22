@@ -190,7 +190,8 @@ class AlarmRingingActivity : ComponentActivity() {
             return
         }
         lifecycleScope.launch {
-            val alarm = withContext(Dispatchers.IO) { AppDatabase.getInstance(this@AlarmRingingActivity).alarmDao().getById(alarmId) }
+            val dao = AppDatabase.getInstance(this@AlarmRingingActivity).alarmDao()
+            val alarm = withContext(Dispatchers.IO) { dao.getById(alarmId) }
             if (alarm != null) {
                 val snoozeAt = Calendar.getInstance().apply { add(Calendar.MINUTE, SNOOZE_MINUTES) }
                 val snoozedAlarm = alarm.copy(
@@ -198,7 +199,12 @@ class AlarmRingingActivity : ComponentActivity() {
                     minute = snoozeAt.get(Calendar.MINUTE),
                     repeatDays = "",
                 )
-                AlarmScheduler.schedule(this@AlarmRingingActivity, snoozedAlarm)
+                // Se persiste también en la base de datos (no solo en
+                // AlarmManager): sin esto, un reinicio durante los minutos de
+                // posposición hacía que BootReceiver la sustituyera en
+                // silencio por la próxima hora "normal" de la alarma.
+                withContext(Dispatchers.IO) { dao.setSnoozedUntil(alarmId, snoozeAt.timeInMillis) }
+                AlarmScheduler.schedule(this@AlarmRingingActivity, snoozedAlarm, triggerAtMillis = snoozeAt.timeInMillis)
                 DiagnosticsLog.log(this@AlarmRingingActivity, "AlarmRingingActivity", "Alarma $alarmId pospuesta $SNOOZE_MINUTES min")
             }
             finishAndRemoveTask()

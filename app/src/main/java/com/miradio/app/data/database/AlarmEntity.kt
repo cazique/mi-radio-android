@@ -20,6 +20,11 @@ data class AlarmEntity(
     val volumeIncreasing: Boolean,
     val fadeInSeconds: Int,
     val enabled: Boolean,
+    /** Instante (epoch millis) hasta el que está pospuesta esta alarma, o
+     *  null si no hay ninguna posposición pendiente. Ver MIGRATION_4_5 y
+     *  BootReceiver: sin persistir esto, un reinicio durante los minutos de
+     *  posposición hacía que se perdiera sin avisar. */
+    val snoozedUntilMillis: Long? = null,
 )
 
 fun AlarmEntity.toDomain(): Alarm = Alarm(

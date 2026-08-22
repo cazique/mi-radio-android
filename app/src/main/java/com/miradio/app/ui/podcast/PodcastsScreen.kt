@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -30,7 +31,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,7 +52,7 @@ fun PodcastsScreen(
     onOpenSettings: () -> Unit,
     viewModel: PodcastsViewModel = viewModel(factory = PodcastsViewModel.Factory),
 ) {
-    val state by viewModel.state.collectAsState()
+    val state by viewModel.state.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -107,10 +108,10 @@ fun PodcastsScreen(
             )
 
             when {
-                state.isLoading && state.results.isEmpty() -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                state.isLoading && state.results.isEmpty() -> Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
-                state.error != null -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                state.error != null -> Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = state.error ?: "",
@@ -121,7 +122,7 @@ fun PodcastsScreen(
                         OutlinedButton(onClick = viewModel::retry, modifier = Modifier.padding(top = 12.dp)) { Text("Reintentar") }
                     }
                 }
-                state.results.isEmpty() -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                state.results.isEmpty() -> Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     Text(
                         text = if (state.isSearchResults) "No se han encontrado podcasts con ese nombre." else "No se han podido cargar los podcasts populares.",
                         style = MaterialTheme.typography.bodyLarge,
@@ -129,12 +130,17 @@ fun PodcastsScreen(
                         modifier = Modifier.padding(horizontal = 32.dp),
                     )
                 }
+                // weight(1f) en vez de fillMaxSize(): dentro de esta Column sin
+                // pesos, fillMaxSize() pedía la altura completa del Column
+                // ignorando el espacio que ya ocupaban el buscador y las
+                // cabeceras de arriba, así que las últimas filas de la
+                // cuadrícula acababan cortadas más allá del final visible.
                 else -> LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
                     contentPadding = PaddingValues(16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.weight(1f),
                 ) {
                     items(state.results, key = { it.collectionId }) { podcast ->
                         PodcastTile(

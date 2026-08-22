@@ -21,7 +21,20 @@ class BootReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val alarms = AppDatabase.getInstance(context).alarmDao().getAllEnabled()
-                alarms.forEach { AlarmScheduler.schedule(context, it) }
+                val now = System.currentTimeMillis()
+                alarms.forEach { alarm ->
+                    // Si había una posposición pendiente y todavía no ha
+                    // pasado, se restaura tal cual: sin esto, el reinicio la
+                    // habría sustituido en silencio por la próxima hora
+                    // "normal" de la alarma (mañana, o el próximo día que
+                    // repita), perdiendo el snooze sin avisar.
+                    val snoozedUntil = alarm.snoozedUntilMillis
+                    if (snoozedUntil != null && snoozedUntil > now) {
+                        AlarmScheduler.schedule(context, alarm, triggerAtMillis = snoozedUntil)
+                    } else {
+                        AlarmScheduler.schedule(context, alarm)
+                    }
+                }
                 DiagnosticsLog.log(context, "BootReceiver", "${alarms.size} alarma(s) reprogramada(s)")
             } catch (e: Exception) {
                 DiagnosticsLog.logThrowable(context, "BootReceiver", "Fallo reprogramando alarmas tras reiniciar", e)

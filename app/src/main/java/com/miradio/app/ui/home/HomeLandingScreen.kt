@@ -47,7 +47,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -95,7 +95,7 @@ fun HomeLandingScreen(
     onOpenSettings: () -> Unit,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val favoritesCount = state.allStations.count { it.isFavorite }
 
     // Mismo truco que la pantalla de reproducción: el color dominante del
@@ -400,7 +400,7 @@ private fun ClockHeader(modifier: Modifier = Modifier) {
 @Composable
 private fun UpdateAvailableBanner() {
     val context = LocalContext.current
-    val update by UpdateChecker.updateAvailable.collectAsState()
+    val update by UpdateChecker.updateAvailable.collectAsStateWithLifecycle()
     val current = update ?: return
 
     Surface(

@@ -43,6 +43,13 @@ class AlarmReceiver : BroadcastReceiver() {
             try {
                 val dao = AppDatabase.getInstance(context).alarmDao()
                 val alarm = dao.getById(alarmId)
+                // Cualquier posposición pendiente queda consumida en cuanto
+                // suena, sea la propia alarma pospuesta o (si el usuario
+                // llegó a posponerla y luego sonó igualmente por otra vía)
+                // la original: sin esto, un snoozedUntilMillis del pasado se
+                // quedaría colgado y un reinicio posterior lo confundiría
+                // con una posposición todavía pendiente.
+                dao.setSnoozedUntil(alarmId, null)
                 if (alarm != null && alarm.enabled && alarm.repeatDays.isNotBlank()) {
                     AlarmScheduler.schedule(context, alarm)
                 }

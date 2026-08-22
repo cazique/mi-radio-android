@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Card
@@ -28,7 +29,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,9 +49,10 @@ import java.util.Locale
 fun PodcastEpisodesScreen(
     collectionId: String,
     onBack: () -> Unit,
+    onOpenPlayer: () -> Unit,
     viewModel: PodcastEpisodesViewModel = viewModel(factory = PodcastEpisodesViewModel.factory(collectionId)),
 ) {
-    val state by viewModel.state.collectAsState()
+    val state by viewModel.state.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -60,6 +62,15 @@ fun PodcastEpisodesScreen(
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null) }
                 },
                 actions = {
+                    // Esta pantalla no tiene barra inferior ni mini-reproductor
+                    // propios (como Ajustes o editar alarma): sin este botón, en
+                    // cuanto sonaba un episodio no había ninguna forma de llegar
+                    // al reproductor completo para buscar dentro de él.
+                    if (state.playingEpisodeId != null) {
+                        IconButton(onClick = onOpenPlayer) {
+                            Icon(Icons.Filled.GraphicEq, contentDescription = "Abrir reproductor")
+                        }
+                    }
                     if (state.podcast != null) {
                         IconButton(onClick = viewModel::onToggleSubscription) {
                             Icon(
