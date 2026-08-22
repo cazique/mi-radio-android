@@ -206,12 +206,24 @@ class RadioPlayer(
      */
     private fun tickPosition() {
         val duration = activePlayer.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: 0L
+        if (duration <= 0L) {
+            // En directo no hay ninguna posición real que nadie use (el
+            // reproductor muestra la onda, no una barra de progreso): sin
+            // este corte, currentPosition (que en un directo crece sin
+            // parar) obligaba a publicar un estado nuevo cada 500 ms, y con
+            // ello a recomponer a cualquiera que observe uiState (Inicio,
+            // Noticias, Podcasts...) sin que nadie necesitara ese dato.
+            if (_uiState.value.durationMs != 0L || _uiState.value.positionMs != 0L) {
+                _uiState.update { it.copy(positionMs = 0L, durationMs = 0L) }
+            }
+            return
+        }
         val position = activePlayer.currentPosition.coerceAtLeast(0L)
         if (_uiState.value.durationMs != duration || _uiState.value.positionMs != position) {
             _uiState.update { it.copy(positionMs = position, durationMs = duration) }
         }
         val station = currentStation
-        if (duration > 0 && station != null && activePlayer.isPlaying && position - lastPersistedPositionMs >= 5_000) {
+        if (station != null && activePlayer.isPlaying && position - lastPersistedPositionMs >= 5_000) {
             lastPersistedPositionMs = position
             scope.launch { preferencesRepository.savePodcastProgress(station.id, position) }
         }
