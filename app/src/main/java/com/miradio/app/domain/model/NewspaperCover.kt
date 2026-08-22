@@ -4,10 +4,14 @@ enum class NewspaperCategory { NACIONAL, DEPORTIVO }
 
 /**
  * Portada de un periódico para la sección "Portadas de hoy". No se hotlinkea
- * ninguna imagen de un agregador externo (se intentó con kiosko.net y
- * siguió sin cargar, sin forma de comprobar por qué desde este entorno sin
- * red): la portada de verdad se muestra en un navegador embebido dentro de
- * la propia app (ver [NewspaperCoverDialog] en NewsScreen.kt).
+ * la imagen directamente desde la app (Coil/OkHttp sin más: eso ya se probó
+ * dos veces contra kiosko.net y kiosko.net la bloqueaba igual con o sin
+ * cabeceras de navegador, sin forma de comprobar por qué desde este entorno
+ * sin red): en vez de eso se abre la página real de kiosko.net para ese
+ * periódico dentro de un navegador embebido (ver [NewspaperCoverDialog] en
+ * NewsScreen.kt), que si carga la imagen porque la pide como la pediría
+ * cualquier visita normal a kiosko.net (referer y cookies de su propio
+ * dominio), no como una petición de imagen suelta desde otra app.
  */
 data class NewspaperCover(
     val name: String,
@@ -30,9 +34,12 @@ object NewspaperCovers {
     )
 }
 
-/** Búsqueda de imágenes de la portada de hoy: siempre da algún resultado
- *  real (a diferencia de adivinar la URL exacta de un agregador externo),
- *  así que es la fuente principal de la portada, no un último recurso. */
+/** Página real de kiosko.net con la portada de hoy de este periódico (no una
+ *  búsqueda de Google): se abre dentro del navegador embebido de la app. */
+fun NewspaperCover.kioskoPageUrl(): String = "https://kiosko.net/es/np/$code.html"
+
+/** Último recurso si kiosko.net no llega a cargar nada útil: búsqueda de
+ *  imágenes, para no dejar la pantalla completamente vacía. */
 fun NewspaperCover.searchFallbackUrl(): String {
     val query = android.net.Uri.encode("portada $name hoy")
     return "https://www.google.com/search?tbm=isch&q=$query"

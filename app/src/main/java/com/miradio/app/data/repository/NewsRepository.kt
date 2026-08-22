@@ -49,11 +49,16 @@ class NewsRepository(private val context: Context) {
             // Algunos medios (reportado con La Razón) rechazan o cortan la
             // respuesta a peticiones sin cabeceras de navegador, tratándolas
             // como bots: sin esto, esa fuente en concreto podía fallar aunque
-            // la URL del feed fuera correcta.
+            // la URL del feed fuera correcta. El User-Agent es el de un
+            // Chrome de Android real, sin ningún texto que identifique la
+            // app (antes decía "Mi Radio App" dentro de la cadena): algunos
+            // filtros anti-bot bloquean precisamente cualquier UA que no
+            // coincida exactamente con el de un navegador conocido.
             val request = Request.Builder()
                 .url(url)
-                .header("User-Agent", "Mozilla/5.0 (Linux; Android 13; Mi Radio App) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36")
+                .header("User-Agent", "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36")
                 .header("Accept", "application/rss+xml, application/xml, text/xml, */*")
+                .header("Accept-Language", "es-ES,es;q=0.9")
                 .get()
                 .build()
             client.newCall(request).execute().use { response ->
@@ -71,42 +76,58 @@ class NewsRepository(private val context: Context) {
     /** No se fía del orden del feed (reportado: "el boletín siempre es el de
      *  las 2 de la mañana", como si COPE publicara una lista de franjas fija
      *  en vez de devolver siempre la más reciente primero): elige a mano el
-     *  elemento con la fecha de publicación más nueva. Si ningún elemento
-     *  trae una fecha que se pueda interpretar, se queda con el primero
-     *  como antes, en vez de fallar. */
+     *  elemento más reciente.
+     *
+     *  El título de cada episodio trae la franja horaria tal cual ("BOLETÍN
+     *  14:00"), y esa hora ha demostrado ser más fiable que pubDate (que
+     *  llegó a traer una fecha semanas en el futuro para el elemento que
+     *  "ganaba" siempre): se usa como señal principal, y pubDate solo como
+     *  respaldo para los títulos sin esa hora. Se sigue reportando "siempre
+     *  el mismo" pese al primer intento (solo pubDate): probablemente
+     *  bastantes episodios comparten un pubDate roto o idéntico entre sí, no
+     *  solo el que se veía en el futuro. */
     suspend fun fetchLatestBulletin(): Result<NewsArticle?> =
         fetchFeed(BULLETIN_FEED_URL).map { articles ->
-            // Reportado con captura: el título decía "boletín 02:00" pero la
-            // fecha mostrada era de semanas después, en el futuro. Un pubDate
-            // en el futuro no puede ser de verdad "el más reciente" (o el
-            // reloj del móvil está mal, o el propio feed trae un dato roto
-            // para ese elemento): se descarta como candidato a "más nuevo"
-            // en vez de dejar que gane por tener la fecha numéricamente más
-            // alta, igual que antes se descartaba una fecha sin interpretar.
             val now = System.currentTimeMillis()
             val maxFuture = now + TimeUnit.HOURS.toMillis(6)
-            val withParsedDate = articles.mapNotNull { article ->
-                parseRssPubDateMillis(article.pubDate)
-                    ?.takeIf { it <= maxFuture }
-                    ?.let { article to it }
+            val ranked = articles.mapNotNull { article ->
+                val rank = timeFromTitle(article.title, now)
+                    ?: parseRssPubDateMillis(article.pubDate)?.takeIf { it <= maxFuture }
+                rank?.let { article to it }
             }
-            if (withParsedDate.isEmpty() && articles.isNotEmpty()) {
-                // Si ninguna fecha se ha podido interpretar, maxByOrNull con
-                // un valor de reserva igual para todos volvería a devolver
-                // sin querer el primer elemento (el mismo fallo de siempre:
-                // "el boletín siempre es el de las 2"). Se deja constancia
-                // de las fechas en crudo para poder ampliar los formatos de
-                // RssDates la próxima vez, en vez de repetir ese fallo en
-                // silencio.
-                DiagnosticsLog.log(
-                    context,
-                    "NewsRepository",
-                    "Boletín: ninguna fecha reconocida, pubDate en crudo: " +
-                        articles.take(5).joinToString(" | ") { it.pubDate ?: "(vacío)" },
-                )
-            }
-            withParsedDate.maxByOrNull { it.second }?.first ?: articles.firstOrNull()
+            DiagnosticsLog.log(
+                context,
+                "NewsRepository",
+                "Boletín: ${articles.size} episodio(s), " +
+                    articles.take(8).joinToString(" | ") { "\"${it.title}\" pubDate=${it.pubDate ?: "(vacío)"}" },
+            )
+            val chosen = ranked.maxByOrNull { it.second }?.first ?: articles.firstOrNull()
+            DiagnosticsLog.log(context, "NewsRepository", "Boletín elegido: \"${chosen?.title}\"")
+            chosen
         }
+
+    /** Extrae una hora "HH:mm" del título (p. ej. "BOLETÍN 14:00") y la
+     *  ubica hoy; si esa hora cae más de 6h en el futuro respecto a [now]
+     *  (p. ej. son las 00:10 y el título dice "23:00"), se entiende que es
+     *  la última franja de ayer, todavía en el feed. Null si el título no
+     *  trae ninguna hora reconocible. */
+    private fun timeFromTitle(title: String, now: Long): Long? {
+        val match = Regex("""(\d{1,2}):(\d{2})""").find(title) ?: return null
+        val hour = match.groupValues[1].toIntOrNull() ?: return null
+        val minute = match.groupValues[2].toIntOrNull() ?: return null
+        if (hour !in 0..23 || minute !in 0..59) return null
+        val calendar = java.util.Calendar.getInstance().apply {
+            timeInMillis = now
+            set(java.util.Calendar.HOUR_OF_DAY, hour)
+            set(java.util.Calendar.MINUTE, minute)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        if (calendar.timeInMillis > now + TimeUnit.HOURS.toMillis(6)) {
+            calendar.add(java.util.Calendar.DAY_OF_YEAR, -1)
+        }
+        return calendar.timeInMillis
+    }
 
     private fun parseRss(xml: String, sourceId: String?): List<NewsArticle> {
         val articles = mutableListOf<NewsArticle>()

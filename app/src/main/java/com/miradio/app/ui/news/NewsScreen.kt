@@ -607,16 +607,20 @@ private fun NewspaperCoverTile(cover: NewspaperCover, onClick: () -> Unit) {
 private fun todayShortLabel(): String =
     SimpleDateFormat("d MMM", Locale("es", "ES")).format(java.util.Date())
 
-/** Muestra la portada de verdad dentro de la propia app (sin depender de
- *  ninguna URL de imagen adivinada): un navegador embebido con la búsqueda
- *  de imágenes de esa portada de hoy, con opción de abrirla en el
- *  navegador del teléfono para guardar o compartir con sus propias
- *  herramientas (mantener pulsada la imagen). */
+/** Muestra la portada de verdad dentro de la propia app: un navegador
+ *  embebido que carga la página real de kiosko.net para este periódico (no
+ *  una búsqueda de Google) — al ser el propio navegador quien la pide, con
+ *  el referer y las cookies de kiosko.net, carga la imagen que un hotlink
+ *  directo desde Coil/OkHttp no conseguía. Solo si esa página falla del
+ *  todo se cae a una búsqueda de imágenes, para no dejar la pantalla vacía.
+ *  Incluye abrir en el navegador del teléfono para guardar o compartir con
+ *  sus propias herramientas (mantener pulsada la imagen). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NewspaperCoverDialog(cover: NewspaperCover, onDismiss: () -> Unit) {
     val context = LocalContext.current
-    val searchUrl = remember(cover) { cover.searchFallbackUrl() }
+    val pageUrl = remember(cover) { cover.kioskoPageUrl() }
+    var currentUrl by remember(cover) { mutableStateOf(pageUrl) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -630,7 +634,7 @@ private fun NewspaperCoverDialog(cover: NewspaperCover, onDismiss: () -> Unit) {
                         IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null) }
                     },
                     actions = {
-                        IconButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(searchUrl))) }) {
+                        IconButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(currentUrl))) }) {
                             Icon(Icons.Filled.OpenInBrowser, contentDescription = "Abrir en el navegador")
                         }
                     },
@@ -643,8 +647,19 @@ private fun NewspaperCoverDialog(cover: NewspaperCover, onDismiss: () -> Unit) {
                     android.webkit.WebView(viewContext).apply {
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
-                        webViewClient = android.webkit.WebViewClient()
-                        loadUrl(searchUrl)
+                        webViewClient = object : android.webkit.WebViewClient() {
+                            override fun onReceivedError(
+                                view: android.webkit.WebView,
+                                request: android.webkit.WebResourceRequest,
+                                error: android.webkit.WebResourceError,
+                            ) {
+                                if (request.isForMainFrame && currentUrl == pageUrl) {
+                                    currentUrl = cover.searchFallbackUrl()
+                                    view.loadUrl(currentUrl)
+                                }
+                            }
+                        }
+                        loadUrl(pageUrl)
                     }
                 },
                 // Sin "update": se ejecuta en cada recomposición (p. ej. al
