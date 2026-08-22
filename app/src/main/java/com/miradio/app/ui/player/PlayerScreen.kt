@@ -1,7 +1,13 @@
 package com.miradio.app.ui.player
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -52,6 +58,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -254,11 +262,22 @@ fun PlayerScreen(
                     ) {
                         Icon(Icons.Filled.SkipPrevious, contentDescription = stringResource(R.string.cd_previous_station), tint = Color.White, modifier = Modifier.size(36.dp))
                     }
-                    PlayPauseButton(
-                        status = state.player.status,
-                        enabled = station != null,
-                        onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); viewModel.onPlayPauseClick() },
-                    )
+                    Box(contentAlignment = Alignment.Center) {
+                        // En directo no hay ninguna posición/duración real que
+                        // mostrar (nunca hay un "hacia atrás" al que volver);
+                        // en vez de una barra de progreso sin sentido, un
+                        // anillo que gira mientras suena da esa misma
+                        // sensación de "hay actividad en directo".
+                        LiveActivityRing(
+                            isActive = isPlaying,
+                            modifier = Modifier.size(104.dp),
+                        )
+                        PlayPauseButton(
+                            status = state.player.status,
+                            enabled = station != null,
+                            onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); viewModel.onPlayPauseClick() },
+                        )
+                    }
                     IconButton(
                         onClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); viewModel.onSkipStation(1) },
                         enabled = station != null,
@@ -408,6 +427,37 @@ private fun PodcastProgressBar(
             Text(formatDuration(shownPositionMs), color = Color(0xFFB0B0BC), style = MaterialTheme.typography.labelMedium)
             Text(formatDuration(durationMs), color = Color(0xFFB0B0BC), style = MaterialTheme.typography.labelMedium)
         }
+    }
+}
+
+/** Anillo que gira lentamente mientras la radio en directo está sonando
+ *  (se desvanece si está en pausa/detenida): sustituye a una barra de
+ *  progreso, que no tendría ningún sentido en un directo sin posición ni
+ *  duración conocidas. */
+@Composable
+private fun LiveActivityRing(isActive: Boolean, modifier: Modifier = Modifier) {
+    val infiniteTransition = rememberInfiniteTransition(label = "liveRing")
+    val rotationDegrees by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(animation = tween(2600, easing = LinearEasing)),
+        label = "liveRingRotation",
+    )
+    val alpha by animateFloatAsState(
+        targetValue = if (isActive) 1f else 0f,
+        animationSpec = tween(300),
+        label = "liveRingAlpha",
+    )
+    val ringColor = MaterialTheme.colorScheme.secondary
+    Canvas(modifier = modifier) {
+        if (alpha <= 0f) return@Canvas
+        drawArc(
+            color = ringColor.copy(alpha = alpha),
+            startAngle = rotationDegrees,
+            sweepAngle = 110f,
+            useCenter = false,
+            style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round),
+        )
     }
 }
 

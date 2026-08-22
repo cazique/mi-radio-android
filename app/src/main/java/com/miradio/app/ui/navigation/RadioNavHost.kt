@@ -1,5 +1,12 @@
 package com.miradio.app.ui.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -40,7 +47,16 @@ object Routes {
 
 @Composable
 fun RadioNavHost(navController: NavHostController = rememberNavController()) {
-    NavHost(navController = navController, startDestination = Routes.HOME) {
+    NavHost(
+        navController = navController,
+        startDestination = Routes.HOME,
+        // Fundido + pequeño deslizamiento en vez del cambio en seco de
+        // antes (una pantalla sustituía a otra de golpe, sin transición).
+        enterTransition = { fadeIn(tween(220)) + slideInHorizontally(tween(220)) { it / 8 } },
+        exitTransition = { fadeOut(tween(180)) },
+        popEnterTransition = { fadeIn(tween(220)) },
+        popExitTransition = { fadeOut(tween(180)) + slideOutHorizontally(tween(180)) { it / 8 } },
+    ) {
         composable(Routes.HOME) {
             HomeLandingScreen(
                 onOpenPlayer = { navController.navigate(Routes.PLAYER) },
@@ -74,7 +90,16 @@ fun RadioNavHost(navController: NavHostController = rememberNavController()) {
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) },
             )
         }
-        composable(Routes.PLAYER) {
+        composable(
+            route = Routes.PLAYER,
+            // El reproductor a pantalla completa se abre como una hoja
+            // modal que sube desde abajo (como Spotify), en vez del mismo
+            // fundido con deslizamiento lateral que el resto de pantallas.
+            enterTransition = { slideInVertically(tween(280)) { fullHeight -> fullHeight } + fadeIn(tween(280)) },
+            exitTransition = { fadeOut(tween(160)) },
+            popEnterTransition = { fadeIn(tween(200)) },
+            popExitTransition = { slideOutVertically(tween(240)) { fullHeight -> fullHeight } + fadeOut(tween(240)) },
+        ) {
             PlayerScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.SETTINGS) {

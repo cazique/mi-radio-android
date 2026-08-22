@@ -3,6 +3,7 @@ package com.miradio.app.ui.news
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -216,27 +217,33 @@ fun NewsScreen(
                             modifier = Modifier.padding(32.dp),
                         )
                     }
-                    else -> LazyColumn(
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(20.dp),
-                    ) {
-                        if (state.selectedSource.id == NewsSource.FOR_YOU_ID) {
-                            item { PortadasSection() }
-                        }
-                        items(state.articles, key = { it.link }) { article ->
-                            val sourceLabel = if (state.selectedSource.id == NewsSource.FOR_YOU_ID) {
-                                state.sources.firstOrNull { it.id == article.sourceId }?.label ?: ""
-                            } else {
-                                state.selectedSource.label
+                    // AnimatedContent con la propia pestaña como "target": un
+                    // fundido suave entre listas al cambiar de pestaña, en
+                    // vez del salto en seco de antes (Grok señaló que faltaban
+                    // microanimaciones al cambiar de pestaña).
+                    else -> AnimatedContent(targetState = state.selectedSource.id, label = "newsList") {
+                        LazyColumn(
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(20.dp),
+                        ) {
+                            if (state.selectedSource.id == NewsSource.FOR_YOU_ID) {
+                                item { PortadasSection() }
                             }
-                            NewsArticleCard(
-                                article = article,
-                                sourceLabel = sourceLabel,
-                                onClick = {
-                                    selectedArticle = article
-                                    viewModel.onArticleOpened(article)
-                                },
-                            )
+                            items(state.articles, key = { it.link }) { article ->
+                                val sourceLabel = if (state.selectedSource.id == NewsSource.FOR_YOU_ID) {
+                                    state.sources.firstOrNull { it.id == article.sourceId }?.label ?: ""
+                                } else {
+                                    state.selectedSource.label
+                                }
+                                NewsArticleCard(
+                                    article = article,
+                                    sourceLabel = sourceLabel,
+                                    onClick = {
+                                        selectedArticle = article
+                                        viewModel.onArticleOpened(article)
+                                    },
+                                )
+                            }
                         }
                     }
                 }
