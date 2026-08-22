@@ -349,7 +349,7 @@ class PlaybackService : MediaSessionService() {
         }
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(getString(R.string.app_name))
             .setOngoing(true)
             .build()
@@ -372,7 +372,14 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession {
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
+        // Si onCreate() abortó (rechazado el paso a primer plano, ver más
+        // arriba) mediaSession nunca llega a inicializarse: devolver el
+        // lateinit sin comprobar aquí crasheaba con
+        // UninitializedPropertyAccessException en cuanto algún controlador
+        // (la propia notificación, un auricular Bluetooth...) intentaba
+        // conectar con el servicio ya "muerto" pero todavía no destruido.
+        if (!::mediaSession.isInitialized) return null
         DiagnosticsLog.log(this, "PlaybackService", "onGetSession(${controllerInfo.packageName})")
         return mediaSession
     }

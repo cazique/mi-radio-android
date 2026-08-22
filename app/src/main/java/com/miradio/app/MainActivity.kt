@@ -229,8 +229,13 @@ private fun MiRadioApp(simpleMode: Boolean) {
     // pasa ya resuelto. radioPlayer es null hasta que el servicio arranca
     // (p. ej. justo al abrir la app), de ahí el estado por defecto.
     val radioPlayer by PlaybackServiceConnector.player.collectAsState()
-    val miniPlayerState by (radioPlayer?.uiState ?: remember { MutableStateFlow(PlayerUiState()) })
-        .collectAsState()
+    // remember() siempre se llama (nunca dentro del ?:): condicionarlo a
+    // que radioPlayer sea null podía saltárselo entero en la recomposición
+    // en la que el servicio termina de conectar (null -> no null), lo que
+    // descuadra la posición del resto de remember de esta composición (el
+    // fallo real de Compose que solo se nota más tarde, y no siempre aquí).
+    val fallbackUiState = remember { MutableStateFlow(PlayerUiState()) }
+    val miniPlayerState by (radioPlayer?.uiState ?: fallbackUiState).collectAsState()
 
     Scaffold(
         bottomBar = {

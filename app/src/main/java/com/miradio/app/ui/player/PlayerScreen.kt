@@ -88,6 +88,11 @@ fun PlayerScreen(
     var showDelayDialog by remember { mutableStateOf(false) }
     val station = state.player.station
     val isPlaying = state.player.status == PlaybackStatus.PLAYING
+    // durationMs > 0 = contenido bajo demanda (episodio de podcast,
+    // boletín): esos no son "en directo", así que ni la insignia de abajo
+    // ni los controles de avance/retroceso de más adelante deben tratarlos
+    // como si lo fueran.
+    val hasDuration = state.player.durationMs > 0
     val haptic = LocalHapticFeedback.current
 
     // Color dominante del logo de la emisora, extraído con la Palette API,
@@ -161,7 +166,7 @@ fun PlayerScreen(
                     .shadow(elevation = 24.dp, shape = RoundedCornerShape(24.dp), clip = false),
             ) {
                 StationLogo(logoUrl = station?.logoUrl, modifier = Modifier.fillMaxSize(), cornerRadius = 24)
-                if (isPlaying) {
+                if (isPlaying && !hasDuration) {
                     Surface(
                         color = MaterialTheme.colorScheme.secondary,
                         shape = RoundedCornerShape(bottomStart = 20.dp, topEnd = 20.dp),
@@ -216,12 +221,12 @@ fun PlayerScreen(
                 )
             }
 
-            // durationMs > 0 = contenido bajo demanda (episodio de podcast,
-            // boletín): ahí tiene sentido una barra que se puede arrastrar y
-            // saltar 15 s, cosas que no existen en un directo de radio (no
-            // hay "hacia atrás" al que ir). En un directo se deja tal cual
-            // el Waveform + emisora anterior/siguiente de siempre.
-            val hasDuration = state.player.durationMs > 0
+            // hasDuration (arriba del todo): con contenido bajo demanda
+            // (episodio de podcast, boletín) tiene sentido una barra que se
+            // puede arrastrar y saltar 15 s, cosas que no existen en un
+            // directo de radio (no hay "hacia atrás" al que ir). En un
+            // directo se deja tal cual el Waveform + emisora anterior/
+            // siguiente de siempre.
             if (hasDuration) {
                 PodcastProgressBar(
                     positionMs = state.player.positionMs,

@@ -7,6 +7,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.os.Build
 import android.graphics.drawable.BitmapDrawable
 import android.widget.RemoteViews
 import coil.Coil
@@ -149,14 +150,20 @@ class RadioWidgetProvider : AppWidgetProvider() {
             return views
         }
 
+        /** Un botón de widget arranca el servicio en segundo plano, sin
+         *  ninguna Activity visible detrás: para que Android sepa que va a
+         *  llamar a startForeground() nada más arrancar y no lo rechace
+         *  (ForegroundServiceStartNotAllowedException, visto en el
+         *  registro), el PendingIntent tiene que crearse con
+         *  getForegroundService(), no con el getService() genérico. */
         private fun servicePendingIntent(context: Context, action: String, requestCode: Int): PendingIntent {
             val intent = Intent(context, PlaybackService::class.java).setAction(action)
-            return PendingIntent.getService(
-                context,
-                requestCode,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-            )
+            val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                PendingIntent.getForegroundService(context, requestCode, intent, flags)
+            } else {
+                PendingIntent.getService(context, requestCode, intent, flags)
+            }
         }
     }
 }

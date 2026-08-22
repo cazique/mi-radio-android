@@ -79,7 +79,7 @@ class BreakingNewsWorker(context: Context, params: WorkerParameters) : Coroutine
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(sourceLabel)
             .setStyle(NotificationCompat.BigTextStyle().bigText(title))

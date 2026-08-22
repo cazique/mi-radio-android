@@ -30,6 +30,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -81,7 +82,14 @@ class RadioPlayer(
             if (_uiState.value.status != PlaybackStatus.ERROR) return
             val station = currentStation ?: return
             DiagnosticsLog.log(context, "RadioPlayer", "Conectividad recuperada, reintentando ${station.id}")
-            retryNow(station)
+            // registerDefaultNetworkCallback() sin Handler explícito entrega
+            // los callbacks en un hilo de Android que NO es el principal;
+            // ExoPlayer exige que se le acceda siempre desde el mismo hilo
+            // en el que se creó (aquí, el principal). Llamar a retryNow()
+            // (que toca directamente al reproductor) aquí mismo crasheaba
+            // con "Player is accessed on the wrong thread" justo al volver
+            // la conectividad.
+            scope.launch { retryNow(station) }
         }
     }
 
@@ -310,6 +318,18 @@ class RadioPlayer(
             .setLoadControl(loadControl)
             .setAudioAttributes(audioAttributes, /* handleAudioFocus= */ true)
             .build()
+            .apply {
+                // WAKE_LOCK está declarado en el manifest pero no servía de
+                // nada sin esto: en varios móviles la radio se cortaba al
+                // apagar la pantalla porque la CPU entraba en reposo
+                // profundo a media descarga del stream.
+                setWakeMode(C.WAKE_MODE_NETWORK)
+                // Al desenchufar los auriculares (o cortarse el Bluetooth),
+                // ExoPlayer seguía sonando a todo volumen por el altavoz en
+                // vez de pausarse solo, como hace cualquier reproductor de
+                // música normal.
+                setHandleAudioBecomingNoisy(true)
+            }
     }
 
     /**
@@ -511,9 +531,12 @@ class RadioPlayer(
 
     fun release() {
         DiagnosticsLog.log(context, "RadioPlayer", "release()")
-        sleepTimerJob?.cancel()
-        retryJob?.cancel()
-        pendingSwitchJob?.cancel()
+        // scope.cancel() antes que nada: cancelar sleepTimerJob/retryJob/
+        // pendingSwitchJob por separado no paraba el bucle de tickPosition()
+        // (while(true) { delay(500); tickPosition() } lanzado en init con
+        // scope.launch, sin guardar su Job) — seguía sondeando posición
+        // contra un ExoPlayer ya liberado unas líneas más abajo.
+        scope.cancel()
         runCatching { connectivityManager?.unregisterNetworkCallback(networkCallback) }
         localPlayer.removeListener(playerListener)
         castPlayer?.removeListener(playerListener)
