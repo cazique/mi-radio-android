@@ -74,26 +74,36 @@ class NewsRepository(private val context: Context) {
     }
 
     /** No se fía del orden del feed (reportado: "el boletín siempre es el de
-     *  las 2 de la mañana", como si COPE publicara una lista de franjas fija
-     *  en vez de devolver siempre la más reciente primero): elige a mano el
-     *  elemento más reciente.
-     *
-     *  El título de cada episodio trae la franja horaria tal cual ("BOLETÍN
-     *  14:00"), y esa hora ha demostrado ser más fiable que pubDate (que
-     *  llegó a traer una fecha semanas en el futuro para el elemento que
-     *  "ganaba" siempre): se usa como señal principal, y pubDate solo como
-     *  respaldo para los títulos sin esa hora. Se sigue reportando "siempre
-     *  el mismo" pese al primer intento (solo pubDate): probablemente
-     *  bastantes episodios comparten un pubDate roto o idéntico entre sí, no
-     *  solo el que se veía en el futuro. */
+     *  las 2 de la mañana"). Un registro real (ver diagnóstico) reveló el
+     *  formato de verdad de este feed: los episodios ya archivados llevan un
+     *  título con la fecha completa ("18:00H | 27 AGO 2024 | BOLETÍN"),
+     *  mientras que el episodio del momento (el único todavía sin archivar)
+     *  se llama solo "BOLETÍN HH:MM", sin fecha. Un primer intento (solo
+     *  pubDate) fallaba porque pubDate viene roto para ese episodio sin
+     *  archivar; un segundo intento (sacar la hora del título y ponerla en
+     *  el día de hoy para CUALQUIER título) fallaba distinto: un episodio
+     *  archivado de 2024 con hora "18:00" en el título ganaba siempre a uno
+     *  de hoy con hora "02:00", por tener la hora numéricamente más alta,
+     *  ignorando que el 2024 en su propio título lo desmentía. Ahora se
+     *  distingue explícitamente: si hay algún episodio sin fecha en el
+     *  título, ese es el actual y gana siempre; solo si no hay ninguno se
+     *  cae a ordenar los archivados por su fecha completa (o por pubDate si
+     *  ni eso se puede sacar del título). */
     suspend fun fetchLatestBulletin(): Result<NewsArticle?> =
         fetchFeed(BULLETIN_FEED_URL).map { articles ->
             val now = System.currentTimeMillis()
             val maxFuture = now + TimeUnit.HOURS.toMillis(6)
-            val ranked = articles.mapNotNull { article ->
-                val rank = timeFromTitle(article.title, now)
-                    ?: parseRssPubDateMillis(article.pubDate)?.takeIf { it <= maxFuture }
-                rank?.let { article to it }
+            val hasYear = Regex("""\d{4}""")
+            val current = articles.filter { !hasYear.containsMatchIn(it.title) }
+            val chosen = if (current.isNotEmpty()) {
+                current.maxByOrNull { timeFromTitle(it.title, now) ?: Long.MIN_VALUE } ?: current.first()
+            } else {
+                val ranked = articles.mapNotNull { article ->
+                    val rank = archivedDateFromTitle(article.title)?.takeIf { it <= maxFuture }
+                        ?: parseRssPubDateMillis(article.pubDate)?.takeIf { it <= maxFuture }
+                    rank?.let { article to it }
+                }
+                ranked.maxByOrNull { it.second }?.first ?: articles.firstOrNull()
             }
             DiagnosticsLog.log(
                 context,
@@ -101,7 +111,6 @@ class NewsRepository(private val context: Context) {
                 "Boletín: ${articles.size} episodio(s), " +
                     articles.take(8).joinToString(" | ") { "\"${it.title}\" pubDate=${it.pubDate ?: "(vacío)"}" },
             )
-            val chosen = ranked.maxByOrNull { it.second }?.first ?: articles.firstOrNull()
             DiagnosticsLog.log(context, "NewsRepository", "Boletín elegido: \"${chosen?.title}\"")
             chosen
         }
@@ -110,7 +119,8 @@ class NewsRepository(private val context: Context) {
      *  ubica hoy; si esa hora cae más de 6h en el futuro respecto a [now]
      *  (p. ej. son las 00:10 y el título dice "23:00"), se entiende que es
      *  la última franja de ayer, todavía en el feed. Null si el título no
-     *  trae ninguna hora reconocible. */
+     *  trae ninguna hora reconocible. Solo se usa con títulos ya filtrados
+     *  para no llevar ninguna fecha completa (ver [fetchLatestBulletin]). */
     private fun timeFromTitle(title: String, now: Long): Long? {
         val match = Regex("""(\d{1,2}):(\d{2})""").find(title) ?: return null
         val hour = match.groupValues[1].toIntOrNull() ?: return null
@@ -127,6 +137,37 @@ class NewsRepository(private val context: Context) {
             calendar.add(java.util.Calendar.DAY_OF_YEAR, -1)
         }
         return calendar.timeInMillis
+    }
+
+    private val SPANISH_MONTH_ABBREVIATIONS = mapOf(
+        "ENE" to 0, "FEB" to 1, "MAR" to 2, "ABR" to 3, "MAY" to 4, "JUN" to 5,
+        "JUL" to 6, "AGO" to 7, "SEP" to 8, "OCT" to 9, "NOV" to 10, "DIC" to 11,
+    )
+
+    /** Fecha completa de un episodio ya archivado, p. ej. "18:00H | 27 AGO
+     *  2024 | BOLETÍN" o "02:00H | 27-08-2024 | BOLETÍN". Null si el título
+     *  no trae ninguna de las dos variantes de fecha completa observadas. */
+    private fun archivedDateFromTitle(title: String): Long? {
+        Regex("""(\d{1,2}):(\d{2})H?\s*\|\s*(\d{1,2})\s+([A-ZÑ]{3})\s+(\d{4})""", RegexOption.IGNORE_CASE)
+            .find(title)?.let { m ->
+                val (hour, minute, day, monthAbbr, year) = m.destructured
+                val month = SPANISH_MONTH_ABBREVIATIONS[monthAbbr.uppercase()] ?: return@let
+                dateMillis(year.toInt(), month, day.toInt(), hour.toInt(), minute.toInt())?.let { return it }
+            }
+        Regex("""(\d{1,2}):(\d{2})H?\s*\|\s*(\d{1,2})-(\d{1,2})-(\d{4})""")
+            .find(title)?.let { m ->
+                val (hour, minute, day, month, year) = m.destructured
+                dateMillis(year.toInt(), month.toInt() - 1, day.toInt(), hour.toInt(), minute.toInt())?.let { return it }
+            }
+        return null
+    }
+
+    private fun dateMillis(year: Int, month: Int, day: Int, hour: Int, minute: Int): Long? {
+        if (hour !in 0..23 || minute !in 0..59 || month !in 0..11 || day !in 1..31) return null
+        return java.util.Calendar.getInstance().apply {
+            set(year, month, day, hour, minute, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
     }
 
     private fun parseRss(xml: String, sourceId: String?): List<NewsArticle> {
