@@ -194,7 +194,19 @@ class PlaybackService : MediaSessionService() {
         // Por eso publicamos aquí una notificación provisional ya mismo, y
         // luego dejamos que Media3 la sustituya por la real con los datos
         // de la emisora en reproducción.
-        startForegroundImmediately()
+        //
+        // Reportado con FATAL en el registro (Android 12+): el sistema
+        // puede negar el paso a primer plano con
+        // ForegroundServiceStartNotAllowedException si decide que el
+        // proceso no tiene ya suficiente "recencia" con el usuario en ese
+        // instante (una carrera conocida de Android, no algo que la app
+        // pueda evitar del todo). Antes esto tumbaba toda la app; ahora se
+        // para el servicio con orden y se sale de onCreate() sin montar
+        // nada más, en vez de dejar que la excepción se propague.
+        if (!startForegroundImmediately()) {
+            stopSelf()
+            return
+        }
 
         // Si algo de lo siguiente falla, la notificación provisional de
         // arriba se quedaría pegada para siempre (sin emisora, sin
@@ -323,7 +335,10 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
-    private fun startForegroundImmediately() {
+    /** @return false si Android ha rechazado el paso a primer plano (en vez
+     *  de dejar que la excepción tumbe toda la app), para que [onCreate]
+     *  pueda parar el servicio con orden en ese caso. */
+    private fun startForegroundImmediately(): Boolean {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
@@ -339,15 +354,21 @@ class PlaybackService : MediaSessionService() {
             .setOngoing(true)
             .build()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            ServiceCompat.startForeground(
-                this,
-                NOTIFICATION_ID,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
-            )
-        } else {
-            ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, 0)
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ServiceCompat.startForeground(
+                    this,
+                    NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
+                )
+            } else {
+                ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, 0)
+            }
+            true
+        } catch (e: Exception) {
+            DiagnosticsLog.logThrowable(this, "PlaybackService", "Rechazado el paso a primer plano", e)
+            false
         }
     }
 
