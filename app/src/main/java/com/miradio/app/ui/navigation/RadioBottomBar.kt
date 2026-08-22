@@ -7,12 +7,14 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -58,7 +60,21 @@ fun RadioBottomBar(navController: NavHostController, simpleMode: Boolean = false
                     }
                 },
                 icon = { Icon(tab.icon, contentDescription = null) },
-                label = { Text(stringResource(tab.labelRes)) },
+                // Con 5 pestañas, "Favoritos" y "Podcasts" no cabían en una
+                // línea con el tamaño de letra normal de la barra y se
+                // partían en dos (se veía "Favorito" / "s"). labelSmall (más
+                // pequeño que el label por defecto) más una sola línea que
+                // recorta con puntos suspensivos si aun así no cupiera, en
+                // vez de partir la palabra.
+                label = {
+                    Text(
+                        text = stringResource(tab.labelRes),
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        softWrap = false,
+                    )
+                },
             )
         }
     }

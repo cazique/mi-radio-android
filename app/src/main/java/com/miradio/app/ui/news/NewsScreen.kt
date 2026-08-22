@@ -625,22 +625,29 @@ private fun NewspaperCoverTile(cover: NewspaperCover, onClick: () -> Unit) {
 private fun todayShortLabel(): String =
     SimpleDateFormat("d MMM", Locale("es", "ES")).format(java.util.Date())
 
-/** Script que busca la imagen más grande realmente pintada en la página
- *  (no una adivinada por su URL): en la portada de kiosko.net de un
- *  periódico, esa siempre es la propia portada. Se ejecuta con
- *  evaluateJavascript tras dar tiempo a que la página cargue sus <img>. */
+/** Script que busca la imagen de la portada realmente pintada en la página
+ *  (no una adivinada por su URL): en kiosko.net, una portada de periódico es
+ *  siempre una imagen vertical (más alta que ancha), a diferencia del
+ *  logotipo del sitio o de banners, que suelen ser apaisados o cuadrados;
+ *  de ahí que se prefiera la imagen VERTICAL más grande en vez de, sin más,
+ *  la imagen más grande de toda la página (que en una maqueta de escritorio
+ *  como la de kiosko.net puede ser perfectamente un logo ancho). Se ejecuta
+ *  con evaluateJavascript tras dar tiempo a que la página cargue sus <img>. */
 private const val LARGEST_IMAGE_JS = """
 (function() {
     var imgs = document.querySelectorAll('img');
-    var best = null, bestArea = 0;
+    var bestPortrait = null, bestPortraitArea = 0;
+    var bestAny = null, bestAnyArea = 0;
     for (var i = 0; i < imgs.length; i++) {
         var im = imgs[i];
         var w = im.naturalWidth || im.width || 0;
         var h = im.naturalHeight || im.height || 0;
         var area = w * h;
-        if (area > bestArea) { bestArea = area; best = im; }
+        if (area > bestAnyArea) { bestAnyArea = area; bestAny = im; }
+        if (h > w * 1.2 && area > bestPortraitArea) { bestPortraitArea = area; bestPortrait = im; }
     }
-    best ? best.src : '';
+    var chosen = bestPortrait || bestAny;
+    chosen ? chosen.src : '';
 })();
 """
 
@@ -733,53 +740,60 @@ private fun NewspaperCoverDialog(cover: NewspaperCover, onDismiss: () -> Unit) {
                 // El WebView vive siempre (hace falta para la extracción), pero
                 // solo se ve (a tamaño completo) si hay que caer al respaldo;
                 // mientras tanto queda a tamaño 0 cargando en segundo plano.
+                // Último recurso si la extracción no da con la imagen a
+                // tiempo: sin esto, un spinner infinito no dejaría ver ni
+                // siquiera la página de kiosko.net tal cual.
+                LaunchedEffect(cover) {
+                    kotlinx.coroutines.delay(7_000)
+                    if (bitmap == null) showWebViewFallback = true
+                }
+
                 AndroidView(
                     modifier = if (showWebViewFallback) Modifier.fillMaxSize() else Modifier.size(0.dp),
                     factory = { viewContext ->
                         android.webkit.WebView(viewContext).apply {
                             settings.javaScriptEnabled = true
                             settings.domStorageEnabled = true
-                            // onPageFinished puede llegar más de una vez (p. ej.
-                            // si hay una redirección de por medio antes del
-                            // contenido final): sin esta guarda se lanzaría la
-                            // extracción y la descarga más de una vez.
-                            var attempted = false
+                            // Para que, si hace falta caer al respaldo, se vea
+                            // como una página normal de móvil (con opción de
+                            // pellizcar para hacer zoom) en vez de la maqueta de
+                            // escritorio encogida y sin poder ampliarla.
+                            settings.useWideViewPort = true
+                            settings.loadWithOverviewMode = true
+                            settings.setSupportZoom(true)
+                            settings.builtInZoomControls = true
+                            settings.displayZoomControls = false
+                            // kiosko.net puede pasar por una redirección antes
+                            // de la página final (onPageFinished llegaría más
+                            // de una vez): en vez de intentar la extracción
+                            // solo la primera vez, se reintenta en cada
+                            // onPageFinished hasta conseguir la imagen, así la
+                            // redirección no se come el único intento.
                             webViewClient = object : android.webkit.WebViewClient() {
                                 override fun onPageFinished(view: android.webkit.WebView, url: String?) {
-                                    if (attempted) return
-                                    attempted = true
+                                    if (bitmap != null) return
                                     // Margen para que las imágenes (sobre todo si
                                     // la portada se carga de forma perezosa)
                                     // terminen de aparecer antes de mirar el DOM.
                                     view.postDelayed({
+                                        if (bitmap != null) return@postDelayed
                                         view.evaluateJavascript(LARGEST_IMAGE_JS) { rawResult ->
                                             val imageUrl = rawResult
                                                 ?.trim('"')
                                                 ?.takeIf { it.isNotBlank() && it != "null" }
                                                 ?.replace("\\/", "/")
-                                            if (imageUrl == null) {
-                                                showWebViewFallback = true
-                                                return@evaluateJavascript
-                                            }
+                                                ?: return@evaluateJavascript
                                             val cookie = android.webkit.CookieManager.getInstance().getCookie(pageUrl)
                                             scope.launch(Dispatchers.IO) {
                                                 val downloaded = runCatching {
                                                     ImageSaver.downloadBitmap(context, imageUrl, ImageSaver.hotlinkHeaders(pageUrl, cookie))
                                                 }.getOrNull()
-                                                withContext(Dispatchers.Main) {
-                                                    if (downloaded != null) bitmap = downloaded else showWebViewFallback = true
+                                                if (downloaded != null) {
+                                                    withContext(Dispatchers.Main) { bitmap = downloaded }
                                                 }
                                             }
                                         }
-                                    }, 700)
-                                }
-
-                                override fun onReceivedError(
-                                    view: android.webkit.WebView,
-                                    request: android.webkit.WebResourceRequest,
-                                    error: android.webkit.WebResourceError,
-                                ) {
-                                    if (request.isForMainFrame) showWebViewFallback = true
+                                    }, 1200)
                                 }
                             }
                             loadUrl(pageUrl)
