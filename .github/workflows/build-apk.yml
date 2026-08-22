@@ -67,6 +67,13 @@ jobs:
           path: app/schemas/
 
       - name: Comitear el esquema de Room al repo si ha cambiado
+        # continue-on-error: dos pushes seguidos a main (dos ejecuciones de
+        # este workflow solapadas) hacen que el "git push" de aquí abajo
+        # choque en la que termina segunda ("rejected... fetch first"): sin
+        # esto, ese fallo tumbaba el resto de pasos del job, incluyendo
+        # publicar el APK en la Release de descarga directa (justo el canal
+        # del que tira AppUpdater), aunque el APK se hubiera compilado bien.
+        continue-on-error: true
         run: |
           # git diff no sirve aquí solo: no detecta archivos nuevos sin
           # trackear (que es justo el caso la primera vez, cuando
@@ -76,6 +83,8 @@ jobs:
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git add app/schemas
             git commit -m "chore: actualiza el esquema de Room [skip ci]"
+            git fetch origin main
+            git rebase origin/main
             git push
           else
             echo "Sin cambios en app/schemas, nada que comitear."
