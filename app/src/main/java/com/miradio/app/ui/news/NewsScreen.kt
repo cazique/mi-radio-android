@@ -3,6 +3,7 @@ package com.miradio.app.ui.news
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -357,6 +358,7 @@ private fun NewsArticleCard(article: NewsArticle, sourceLabel: String, onClick: 
         onClick = onClick,
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
     ) {
         if (article.imageUrl != null) {
             Box(modifier = Modifier.fillMaxWidth().aspectRatio(4f / 3f)) {
@@ -780,6 +782,7 @@ private fun BulletinCard(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f)),
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
